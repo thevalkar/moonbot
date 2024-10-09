@@ -21,7 +21,7 @@ Moonbot Token Sniper Bot is a sophisticated tool designed for the Solana blockch
 
 ## Features
 
-- **Real-Time Transaction Monitoring:** Listens to Solana transactions via WebSocket and processes them to identify token purchases.
+- **Real-Time Transaction Monitoring:** Listens to Solana transactions via POST requests (a webhook) and processes them to identify token purchases.
 - **Automated Token Sniping:** Executes buy operations for tokens that meet specific criteria such as Fairly Distributed Value (FDV) thresholds.
 - **Discord Integration:** Provides a Discord bot for managing invite codes, enabling/disabling access, and sending notifications to designated channels.
 - **Telegram Integration:** Sends real-time alerts to Telegram threads corresponding to different transaction sources.
