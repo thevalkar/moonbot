@@ -81,7 +81,13 @@ Before setting up Moonbot, ensure you have the following:
    createdb moonbot_db
    ```
 
-   Run database migrations or set up the schema as required.
+   Run the schema setup using the `schema.sql` file:
+
+   ```bash
+   psql -d moonbot_db -f schema.sql
+   ```
+
+   This command will execute the SQL statements in `schema.sql` to set up the necessary tables and structures in your database.
 
 ## Configuration
 
