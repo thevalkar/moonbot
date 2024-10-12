@@ -217,8 +217,8 @@ const onTransactionBuyAndSignalToken = async (
 
       if (
         (isSignalEntry || isBumpEntry) &&
-        !isSignaling[tokenMint] &&
-        tokenFdv < 5000
+        !isSignaling[tokenMint]
+        // && tokenFdv < 5000
       ) {
         try {
           isSignaling[tokenMint] = true
