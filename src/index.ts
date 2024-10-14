@@ -680,13 +680,15 @@ const getSocialsSignalMessage = async (
   } ${tokenTopFiveHoldersPercentage.toFixed(0)}% \\(${
     isTopFiveGood ? "Good" : "High"
   }\\)
-  ℹ️ LP supply: ${isLpPercentageGood ? "☑️" : "⚠️"} ${
-    tokenLpPercentage ? tokenLpPercentage?.toFixed(0) : "Low"
-  }% \\(${isLpPercentageGood ? "Good" : "low"}\\)
- 
-  
-
-  🔗 [[${sourceName}]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
+  ${
+    //   `ℹ️ LP supply: ${isLpPercentageGood ? "☑️" : "⚠️"} ${
+    //   tokenLpPercentage ? tokenLpPercentage?.toFixed(0) : "Low"
+    // }% \\(${isLpPercentageGood ? "Good" : "low"}\\)`
+    ``
+  }
+  🔗 [[${
+    sourceName === "Raydium" ? "DexScreener" : sourceName
+  }]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
 }
 const sendSocialsNotification = async (
   data: Exclude<
