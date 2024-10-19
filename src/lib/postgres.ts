@@ -1,6 +1,9 @@
 import { Keypair } from "@solana/web3.js"
 import postgres from "postgres"
 import { DigitalAsset } from "@metaplex-foundation/mpl-token-metadata"
+import dotenv from "dotenv"
+
+dotenv.config()
 
 export const sql = postgres(process.env.DATABASE_URL as string)
 

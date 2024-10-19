@@ -280,6 +280,7 @@ client.on("ready", () => {
 //   // )
 // })()
 
+const MOONBOTTER_ROLE_ID = "1266172172402036848"
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return
   await interaction.deferReply({ ephemeral: true })
@@ -315,6 +316,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             SET enabled = false
             WHERE for_user = ${forUser}
           `
+
+          // Remove role
+          const guild = client.guilds.cache.get(GUILD_ID)
+          const member = guild?.members.cache.get(userId)
+          member?.roles.remove(MOONBOTTER_ROLE_ID)
           interaction.editReply({
             content: "Moonbot has been disabled for your account!",
           })
@@ -324,6 +330,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             SET enabled = true
             WHERE for_user = ${forUser}
           `
+          // Add role
+          const guild = client.guilds.cache.get(GUILD_ID)
+          const member = guild?.members.cache.get(userId)
+          member?.roles.add(MOONBOTTER_ROLE_ID)
           interaction.editReply({
             content: "Moonbot has been enabled for your account!",
           })
@@ -347,6 +357,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 })
+// Map through all members and add moonbotter role if they have it enabled
+// client.on(Events.ClientReady, async () => {
+//   const guild = client.guilds.cache.get(GUILD_ID)
+//   if (!guild) {
+//     console.error("Guild not found")
+//     return
+//   }
+
+//   const allUsers =
+//     await sql`SELECT for_user from moonbot_invite_codes WHERE enabled = true`
+//   console.log(allUsers.length, "enabled users")
+//   for (const user of allUsers) {
+//     const isEnabled = user.enabled
+//     console.log(user.for_user, isEnabled)
+//     const allMembers = await guild.members.fetch()
+//     const member = allMembers.find(
+//       (member) => user.for_user.indexOf(member.user.id) !== -1
+//     )
+//     if (member) {
+//       member.roles.add(MOONBOTTER_ROLE_ID)
+//     }
+//   }
+// })
 
 // Access msg
 // client.on(Events.ClientReady, async () => {
@@ -407,7 +440,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 //           },
 //           {
 //             name: "Twitter/X",
-//             value: "[x.com/moonersxyz](https://x.com/moonersxyz)",
+//             value: "[x.com/thevalkar](https://x.com/thevalkar)",
 //           },
 //           {
 //             name: "Moonbot (Sniper Bot) Waitlist",
