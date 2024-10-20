@@ -210,11 +210,6 @@ const onTransactionBuyAndSignalToken = async (
       // This is used to send signal 1 unique buyer
       const isBumpEntry = uniqueBuyersCount > buyersLastSignal
 
-      console.log("uniqueBuyersCount", uniqueBuyersCount)
-      console.log("signalExists", signalExists)
-      console.log("isSignalEntry", isSignalEntry)
-      console.log("isBumpEntry", isBumpEntry)
-
       if (
         (isSignalEntry || isBumpEntry) &&
         !isSignaling[tokenMint]
@@ -223,7 +218,7 @@ const onTransactionBuyAndSignalToken = async (
         try {
           isSignaling[tokenMint] = true
 
-          const [signal] = await insertTokenSignal(
+          await insertTokenSignal(
             tokenMint,
             tokenPrice,
             tokenPairAddress,
@@ -234,39 +229,30 @@ const onTransactionBuyAndSignalToken = async (
             transactionBuyAmount
           )
 
-          const signalWithToken = { ...signal, token }
+          const DISCORD_SHRIMP_CHANNEL_ID = "1246368892688011356"
+          const DISCORD_DOLPHIN_CHANNEL_ID = "1243899842263126157"
+          const DISCORD_WHALE_CHANNEL_ID = "1297547599544324107"
 
-          const DISCORD_PUMPFUN_CHANNEL_ID = "1246368892688011356"
-          const DISCORD_RAYDIUM_CHANNEL_ID = "1243899842263126157"
-          const DISCORD_MOONSHOT_CHANNEL_ID = "1254892493003161640"
+          const TELEGRAM_SHRIMP_THREAD_ID = 7554
+          const TELEGRAM_DOLPHIN_THREAD_ID = 7553
+          const TELEGRAM_WHALE_THREAD_ID = 50378
 
-          const TELEGRAM_PUMPFUN_THREAD_ID = 7554
-          const TELEGRAM_RAYDIUM_THREAD_ID = 7553
-          const TELEGRAM_MOONSHOT_THREAD_ID = 39039
-
-          switch (transactionSource) {
-            case "Raydium":
-              await sendSocialsNotification(
-                data,
-                DISCORD_RAYDIUM_CHANNEL_ID,
-                TELEGRAM_RAYDIUM_THREAD_ID
-              )
-              break
-            case "Pumpfun":
-              await sendSocialsNotification(
-                data,
-                DISCORD_PUMPFUN_CHANNEL_ID,
-                TELEGRAM_PUMPFUN_THREAD_ID
-              )
-              break
-            case "Moonshot":
-              await sendSocialsNotification(
-                data,
-                DISCORD_MOONSHOT_CHANNEL_ID,
-                TELEGRAM_MOONSHOT_THREAD_ID
-              )
-              break
+          let channelIdDiscord, threadIdTelegram
+          if (tokenFdv < 1000) {
+            channelIdDiscord = DISCORD_SHRIMP_CHANNEL_ID
+            threadIdTelegram = TELEGRAM_SHRIMP_THREAD_ID
+          } else if (tokenFdv < 6300) {
+            channelIdDiscord = DISCORD_DOLPHIN_CHANNEL_ID
+            threadIdTelegram = TELEGRAM_DOLPHIN_THREAD_ID
+          } else {
+            channelIdDiscord = DISCORD_WHALE_CHANNEL_ID
+            threadIdTelegram = TELEGRAM_WHALE_THREAD_ID
           }
+          await sendSocialsNotification(
+            data,
+            channelIdDiscord,
+            threadIdTelegram
+          )
         } catch (e) {
           console.log(e)
         } finally {
