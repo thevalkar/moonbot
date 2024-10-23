@@ -10,9 +10,13 @@ import {
 } from "discord.js"
 import sql from "./lib/postgres"
 import { configDotenv } from "dotenv"
+import { decrypt, getSolanaPrice, heliusRpcUrl } from "./lib/utils"
+import { Connection, Keypair } from "@solana/web3.js"
+import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes"
+import { TOKEN_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token"
 configDotenv()
 
-const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN as string
 
 const GUILD_ID = "1215040919313580132"
 const ROLE_ID = "1262242684224147487"
@@ -37,6 +41,7 @@ client.on("ready", () => {
   console.log(`Logged in as ${client.user?.tag}!`)
 })
 
+const connection = new Connection(heliusRpcUrl)
 // Handle messages
 // client.on(Events.MessageCreate, async (message: Message) => {
 //   console.log(message.content)
@@ -270,14 +275,14 @@ client.on("ready", () => {
 // ;(async () => {
 //   const rest = new REST().setToken(DISCORD_BOT_TOKEN)
 
-//   // const command = new SlashCommandBuilder()
-//   //   .setName("enable")
-//   //   .setDescription("Enable or disable Moonbot for your account")
+//   const command = new SlashCommandBuilder()
+//     .setName("wallet")
+//     .setDescription("Get information about your Moonbot wallet")
 
-//   // await rest.put(
-//   //   Routes.applicationGuildCommands(DISCORD_APPLICATION_ID, GUILD_ID),
-//   //   { body: [command.toJSON()] }
-//   // )
+//   await rest.put(
+//     Routes.applicationGuildCommands(DISCORD_APPLICATION_ID, GUILD_ID),
+//     { body: [command.toJSON()] }
+//   )
 // })()
 
 const MOONBOTTER_ROLE_ID = "1266172172402036848"
@@ -286,22 +291,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
   await interaction.deferReply({ ephemeral: true })
 
   try {
+    const userId = interaction.user.id
+
+    const allUsers = await sql`SELECT for_user from moonbot_invite_codes`
+    const forUser = allUsers.find(
+      (user) => user.for_user.indexOf(userId) !== -1
+    )?.for_user
+
+    if (!forUser) {
+      interaction.editReply({
+        content: "You need to have an invite code to use Moonbot!",
+      })
+      return true
+    }
+
     switch (interaction.commandName) {
       case "enable":
-        const userId = interaction.user.id
-
-        const allUsers = await sql`SELECT for_user from moonbot_invite_codes`
-        const forUser = allUsers.find(
-          (user) => user.for_user.indexOf(userId) !== -1
-        )?.for_user
-
-        if (!forUser) {
-          interaction.editReply({
-            content: "You need to have an invite code to use Moonbot!",
-          })
-          return true
-        }
-
         const isEnabled = (
           await sql`
           SELECT enabled from moonbot_invite_codes where for_user = ${forUser}
@@ -339,6 +344,136 @@ client.on(Events.InteractionCreate, async (interaction) => {
           })
         }
 
+        return true
+
+      case "wallet":
+        const solanaPrice = await getSolanaPrice()
+        // Fetch the user's wallet information
+        const userWallet = await sql`
+          SELECT keypair FROM moonbot_invite_codes WHERE for_user = ${forUser} AND enabled = true
+        `
+
+        if (!userWallet.length) {
+          interaction.editReply({
+            content: "No active wallet found for your account!",
+          })
+          return true
+        }
+
+        const decryptedKeypair = await decrypt(userWallet[0].keypair)
+        const kp = Keypair.fromSecretKey(bs58.decode(decryptedKeypair))
+        const solBalance = (await connection.getBalance(kp.publicKey)) / 1e9
+
+        const walletTokenAccounts =
+          await connection.getParsedTokenAccountsByOwner(kp.publicKey, {
+            programId: TOKEN_PROGRAM_ID,
+          })
+
+        const tokens: { mint: string; amount: number }[] = []
+        walletTokenAccounts.value.forEach((tokenAccount) => {
+          const { info } = tokenAccount.account.data.parsed
+          const amount = info.tokenAmount.uiAmount
+          if (amount > 0) {
+            tokens.push({ mint: info.mint, amount })
+          }
+        })
+
+        const rentValue = walletTokenAccounts.value.length * 0.002
+
+        const tokenMintsArray = tokens.map((token) => token.mint)
+        const tokenPrices = await sql<
+          { token_mint: string; price: number }[]
+        >`SELECT DISTINCT ON (token_mint) token_mint, price FROM token_prices WHERE token_mint IN ${sql(
+          tokenMintsArray
+        )} ORDER BY token_mint, timestamp DESC`
+
+        const tokenPricesByMint: { [mint: string]: number } = {}
+        tokenPrices.forEach(({ token_mint, price }) => {
+          tokenPricesByMint[token_mint] = price
+        })
+
+        let tokenValue = 0
+        tokens.forEach((token) => {
+          const price = tokenPricesByMint[token.mint] || 0
+          tokenValue += token.amount * price
+        })
+
+        const totalBalance = solBalance + rentValue + tokenValue
+
+        const balanceInUsd = totalBalance * solanaPrice
+
+        // Sort tokens by value and get top 5
+        const topTokens = tokens
+          .map((token) => ({
+            ...token,
+            value: token.amount * (tokenPricesByMint[token.mint] || 0),
+          }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5)
+
+        // Respond with the wallet's value information
+        interaction.editReply({
+          embeds: [
+            {
+              color: 0x0099ff,
+              title: "💼 Wallet Information",
+              description: "Here are the details of your wallet:",
+              fields: [
+                {
+                  name: "Address",
+                  value: `${kp.publicKey.toBase58()}`,
+                  inline: false,
+                },
+                {
+                  name: "💰 SOL Balance",
+                  value: `${solBalance.toFixed(2)} SOL`,
+                  inline: true,
+                },
+                {
+                  name: "🪙 Token Value",
+                  value: `${tokenValue.toFixed(2)} SOL`,
+                  inline: true,
+                },
+                {
+                  name: "🏠 Rent Value",
+                  value: `${rentValue.toFixed(2)} SOL`,
+                  inline: true,
+                },
+                {
+                  name: "🔢 Total Balance",
+                  value: `**${totalBalance.toFixed(2)} SOL (${Intl.NumberFormat(
+                    "en-US",
+                    {
+                      style: "currency",
+                      currency: "USD",
+                      notation: "compact",
+                    }
+                  ).format(balanceInUsd)})**`,
+                  inline: true,
+                },
+                {
+                  name: "🏆 Top 5 Tokens",
+                  value:
+                    topTokens
+                      .map(
+                        (token, index) =>
+                          `**${index + 1}.** \`${
+                            token.mint
+                          }\`-  **${token.value.toFixed(
+                            2
+                          )} SOL** (${Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                            notation: "compact",
+                          }).format(token.value * solanaPrice)})`
+                      )
+                      .join("\n") || "No tokens",
+                  inline: false,
+                },
+              ],
+            },
+          ],
+        })
         return true
 
       default:
