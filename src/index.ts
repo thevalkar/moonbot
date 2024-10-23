@@ -329,7 +329,7 @@ const snipeToken = async (
       }
     }
 
-    const amountToBuyInSol = 0.005
+    const amountToBuyInSol = 0.015
 
     console.log(
       `${chalk.greenBright(
@@ -392,7 +392,7 @@ expressApp.post("/", async (req, res) => {
   }
 })
 
-const port = process.env.PORT || 45000
+const port = process.env.PORT || 45001
 server.listen(port, () => console.log(`App is running on port ${port}`))
 
 socketConnection.on("connection", (socket) => {

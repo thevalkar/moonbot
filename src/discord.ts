@@ -278,10 +278,16 @@ const connection = new Connection(heliusRpcUrl)
 //   const command = new SlashCommandBuilder()
 //     .setName("wallet")
 //     .setDescription("Get information about your Moonbot wallet")
+//   console.log(command.toJSON())
+
+//   const command2 = new SlashCommandBuilder()
+//     .setName("enable")
+//     .setDescription("Enable or disable Moonbot")
+//   console.log(command2.toJSON())
 
 //   await rest.put(
 //     Routes.applicationGuildCommands(DISCORD_APPLICATION_ID, GUILD_ID),
-//     { body: [command.toJSON()] }
+//     { body: [command.toJSON(), command2.toJSON()] }
 //   )
 // })()
 
