@@ -6,16 +6,11 @@ import {
   PublicKey,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
-  Transaction,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js"
-import {
-  PUMPFUN_PROGRAM_ID,
-  heliusRpcUrl,
-  sendAndRetryTransaction,
-} from "./utils"
+import { PUMPFUN_PROGRAM_ID, heliusRpcUrl } from "./utils"
 
 import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor"
 import idl from "@/data/pumpfun-idl.json"
@@ -29,7 +24,7 @@ import { MEMO_PROGRAM_ID } from "@raydium-io/raydium-sdk"
 import chalk from "chalk"
 
 const connection = new Connection(heliusRpcUrl, {
-  confirmTransactionInitialTimeout: 1 * 60 * 1000,
+  confirmTransactionInitialTimeout: 1 * 80 * 1000,
   commitment: "processed",
 })
 
@@ -45,13 +40,17 @@ const program = new Program(
 const feeRecipient = "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
 const EVENT_AUTH = "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1"
 
-const priorityFee = 0.00015 * LAMPORTS_PER_SOL
+const priorityFee = 0.00025 * LAMPORTS_PER_SOL
 
 const globalState = new PublicKey(
   "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf"
 )
 
-export const buyPumpfunToken = async (
+const jitoPayerKeypair = Keypair.fromSecretKey(
+  Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))
+)
+
+export const getBuyPumpfunTokenTransaction = async (
   connection: Connection,
   keypair: Keypair,
   tokenMint: PublicKey,
@@ -74,7 +73,6 @@ export const buyPumpfunToken = async (
         TOKEN_PROGRAM_ID
       )
 
-      console.log(`Loading Promise`)
       const [bondingCurveData, mintData, account] = await Promise.all([
         program.account.bondingCurve.fetch(bondingCurve),
         connection.getParsedAccountInfo(tokenMint),
@@ -96,7 +94,7 @@ export const buyPumpfunToken = async (
       const virtualTokenPrice =
         adjustedVirtualSolReserves / adjustedVirtualTokenReserves
 
-      const maxSolCost = amountInSol * 1.15
+      const maxSolCost = amountInSol * 1.51
       const finalAmount = amountInSol / virtualTokenPrice
 
       const ixs = []
@@ -144,19 +142,16 @@ export const buyPumpfunToken = async (
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee })
       )
 
-      // ix to transfer moonbot fees
-      // create account first if no balance
-      const feesWallet = new PublicKey(
-        "9rAtMfHKvAobdwyoNYNZg4c63fUVVLJushVPMymv8iRc"
-      )
+      const feesWallet = jitoPayerKeypair.publicKey
 
-      // ixs.push(
-      //   SystemProgram.transfer({
-      //     fromPubkey: keypair.publicKey,
-      //     toPubkey: feesWallet,
-      //     lamports: 0.0005 * 1e9,
-      //   })
-      // )
+      // ix to transfer jito fees
+      ixs.push(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: feesWallet,
+          lamports: 0.0005 * 1e9,
+        })
+      )
 
       console.log(
         `${chalk.green(
@@ -177,35 +172,45 @@ export const buyPumpfunToken = async (
 
       versionedTransaction.sign([keypair])
 
-      const txid = await connection.sendRawTransaction(
-        versionedTransaction.serialize(),
-        {
-          skipPreflight: true,
-          preflightCommitment: "processed",
-          // minContextSlot: latestBlockHash.context.slot,
-          // maxRetries: 0,
-        }
-      )
+      return versionedTransaction.serialize()
 
-      sendAndRetryTransaction(connection, versionedTransaction, latestBlockHash)
+      // const txid = await connection.sendRawTransaction(
+      //   versionedTransaction.serialize(),
+      //   {
+      //     skipPreflight: true,
+      //     preflightCommitment: "processed",
+      //     // minContextSlot: latestBlockHash.context.slot,
+      //     // maxRetries: 0,
+      //   }
+      // )
 
-      await connection.confirmTransaction(txid, "processed")
+      // sendAndRetryTransaction(connection, versionedTransaction, latestBlockHash)
 
-      bought = true
+      // await connection.confirmTransaction(txid, "processed")
 
-      console.log(
-        `${chalk.yellowBright(
-          "[SNIPING_BOT]"
-        )} Bought ${tokenMint} for ${keypair.publicKey.toString()} | https://solscan.io/tx/${txid} | ${new Date().toUTCString()}`
-      )
+      // bought = true
 
-      return txid
+      // console.log(
+      //   `${chalk.yellowBright(
+      //     "[SNIPING_BOT]"
+      //   )} Bought ${tokenMint} for ${keypair.publicKey.toString()} | https://solscan.io/tx/${txid} | ${new Date().toUTCString()}`
+      // )
+
+      // return txid
     } catch (e) {
       console.log(e)
     } finally {
       tries++
       await new Promise((resolve) => setTimeout(resolve, 2500))
     }
+  }
+
+  if (!bought) {
+    console.log(
+      `${chalk.redBright(
+        "[SNIPING_BOT]"
+      )} Failed to buy ${tokenMint} for ${keypair.publicKey.toString()} | ${tries} tries | ${new Date().toUTCString()}`
+    )
   }
 }
 

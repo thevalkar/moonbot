@@ -29,12 +29,13 @@ import sql, {
   selectTokenEntriesUniqueBuyers,
 } from "./lib/postgres"
 import idl from "@/data/pumpfun-idl.json"
-import { buyPumpfunToken } from "@/lib/pumpfun"
+import { getBuyPumpfunTokenTransaction } from "@/lib/pumpfun"
 import { io } from "socket.io-client"
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes"
 import { decrypt } from "@/lib/utils"
 import { createServer } from "http"
 import { configDotenv } from "dotenv"
+import { sendJitoBundle } from "./lib/jito"
 configDotenv()
 
 const isSignaling: {
@@ -152,7 +153,9 @@ const onTransactionBuyAndSignalToken = async (
     if (uniqueBuyersCount >= BUYERS_AMOUNT_FOR_SIGNAL) {
       // @TODO: fdv below 5000 SOL or token age is below 48h
 
-      if (tokenFdv < 5000) {
+      const shouldBuy = tokenFdv < 5000
+
+      if (shouldBuy) {
         const codes = await sql<
           {
             // bs58 encoded keypair
@@ -161,22 +164,26 @@ const onTransactionBuyAndSignalToken = async (
             enabled: boolean
           }[]
         >`select keypair, code, enabled from moonbot_invite_codes`
-        for (const { keypair, code, enabled } of codes) {
-          if (!enabled) {
-            console.log(chalk.yellow(`Code ${code} is disabled`))
-            continue
+
+        const promises = codes.map(async ({ keypair, code, enabled }) => {
+          if (!enabled) return null
+          try {
+            const decrypted = await decrypt(keypair)
+            if (!decrypted) throw new Error("Decryption failed for " + code)
+            const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
+            return await getSnipeTransaction(kp, data)
+          } catch (e) {
+            console.log(`Error buying for ${code}: ` + e)
           }
-          ;(async () => {
-            try {
-              // bs58 to Keypair
-              const decrypted = await decrypt(keypair)
-              if (!decrypted) throw new Error("Decryption failed for " + code)
-              const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
-              await snipeToken(kp, data)
-            } catch (e) {
-              console.log(`Error buying for ${code}: ` + e)
-            }
-          })()
+          return null
+        })
+
+        const txs = (await Promise.all(promises)).filter(
+          (tx): tx is Uint8Array => tx !== undefined && tx !== null
+        )
+
+        if (txs.length > 0) {
+          await sendJitoBundle(txs)
         }
       } else {
         const solanaPrice = await getSolanaPrice()
@@ -189,7 +196,7 @@ const onTransactionBuyAndSignalToken = async (
               currency: "USD",
               notation: "compact",
               maximumFractionDigits: 1,
-            }).format(marketCapInUsd)}), not buying...`
+            }).format(marketCapInUsd)}). Not buying.`
           )
         )
       }
@@ -232,12 +239,15 @@ const onTransactionBuyAndSignalToken = async (
           const DISCORD_SHRIMP_CHANNEL_ID = "1246368892688011356"
           const DISCORD_DOLPHIN_CHANNEL_ID = "1243899842263126157"
           const DISCORD_WHALE_CHANNEL_ID = "1297547599544324107"
+          const DISCORD_EXPERIMENTAL_CHANNEL_ID = "1299041170952818698"
 
           const TELEGRAM_SHRIMP_THREAD_ID = 7554
           const TELEGRAM_DOLPHIN_THREAD_ID = 7553
           const TELEGRAM_WHALE_THREAD_ID = 50378
+          const TELEGRAM_EXPERIMENTAL_THREAD_ID = 50789
 
           let channelIdDiscord, threadIdTelegram
+
           if (tokenFdv < 1000) {
             channelIdDiscord = DISCORD_SHRIMP_CHANNEL_ID
             threadIdTelegram = TELEGRAM_SHRIMP_THREAD_ID
@@ -250,6 +260,7 @@ const onTransactionBuyAndSignalToken = async (
           }
           await sendSocialsNotification(
             data,
+            shouldBuy,
             channelIdDiscord,
             threadIdTelegram
           )
@@ -267,7 +278,7 @@ const onTransactionBuyAndSignalToken = async (
   }
 }
 
-const snipeToken = async (
+const getSnipeTransaction = async (
   keypair: Keypair,
   data: Exclude<
     Awaited<ReturnType<typeof getParsedTokenAndTransactionDataFromTransaction>>,
@@ -307,7 +318,7 @@ const snipeToken = async (
       )} ${keypair.publicKey.toString()}: Already has balance for ${tokenMint} | ${new Date().toUTCString()}`
     )
 
-    return true
+    return
   }
 
   try {
@@ -329,7 +340,13 @@ const snipeToken = async (
       }
     }
 
-    const amountToBuyInSol = 0.015
+    const dynamicEntrySize = walletBalance / 1e9 / 3 / 80
+    const amountToBuyInSol =
+      dynamicEntrySize < 0.005
+        ? 0.005
+        : dynamicEntrySize > 0.05
+        ? 0.05
+        : dynamicEntrySize
 
     console.log(
       `${chalk.greenBright(
@@ -338,17 +355,17 @@ const snipeToken = async (
     )
 
     if (transactionSource === "Raydium") {
-      const res = await buyRaydiumToken(
-        connection,
-        keypair,
-        tokenMint,
-        tokenPairAddress,
-        amountToBuyInSol,
-        tokenRaydiumPoolKeys
-      )
-      console.log(res)
+      // const res = await buyRaydiumToken(
+      //   sniperConnection,
+      //   keypair,
+      //   tokenMint,
+      //   tokenPairAddress,
+      //   amountToBuyInSol,
+      //   tokenRaydiumPoolKeys
+      // )
+      // console.log(res)
     } else if (transactionSource === "Pumpfun") {
-      await buyPumpfunToken(
+      const pumpfunTx = await getBuyPumpfunTokenTransaction(
         connection,
         keypair,
         new PublicKey(tokenMint),
@@ -357,6 +374,8 @@ const snipeToken = async (
         new PublicKey(tokenPumpfunGlobalAddress!),
         amountToBuyInSol
       )
+
+      return pumpfunTx
     }
   } catch (e) {
     console.error("Error buying token", e)
@@ -398,7 +417,6 @@ server.listen(port, () => console.log(`App is running on port ${port}`))
 socketConnection.on("connection", (socket) => {
   console.log("a user connected")
 })
-
 const connection = new Connection(heliusRpcUrl, {
   confirmTransactionInitialTimeout: 1 * 80 * 1000,
   commitment: "processed",
@@ -593,7 +611,8 @@ const getSocialsSignalMessage = async (
   tokenPrice: number,
   tokenIsRenounced: boolean,
   tokenLpPercentage: number,
-  tokenTopFiveHoldersPercentage: number
+  tokenTopFiveHoldersPercentage: number,
+  isSniped: boolean
 ) => {
   const solanaPrice = await getSolanaPrice()
   const marketCapInUsd = solanaPrice * tokenFdv
@@ -646,7 +665,7 @@ const getSocialsSignalMessage = async (
   }
 
   return `
-  $\`${tokenData.metadata.symbol}\` \\(\`${
+  ${isSniped ? "🟢" : "⚪"} $\`${tokenData.metadata.symbol}\` \\(\`${
     tokenData.metadata.name
   }\`\\) bought by the cabal on ${transactionSource}
   
@@ -681,6 +700,7 @@ const sendSocialsNotification = async (
     Awaited<ReturnType<typeof getParsedTokenAndTransactionDataFromTransaction>>,
     null
   >,
+  isSniped: boolean,
   discordChannel: string,
   telegramThreadId?: number
 ) => {
@@ -691,7 +711,8 @@ const sendSocialsNotification = async (
     data.tokenPrice,
     data.tokenIsRenounced,
     data.tokenLpPercentage,
-    data.tokenTopFiveHoldersPercentage
+    data.tokenTopFiveHoldersPercentage,
+    isSniped
   )
 
   try {

@@ -933,8 +933,6 @@ export const sendAndRetryTransaction = async (
   let txid
   let confirmed = false
 
-  await new Promise((resolve) => setTimeout(resolve, 4000))
-
   try {
     blockHeight = await connection.getBlockHeight("processed")
     txid = await connection.sendRawTransaction(transaction.serialize(), {
@@ -967,12 +965,8 @@ export const sendAndRetryTransaction = async (
         // minContextSlot: blockhashAndContext.context.slot,
         // maxRetries: 0,
       })
-      // const random = Math.floor(Math.random() * (1000 - 3000 + 1) + 3000)
-      await new Promise((resolve) => setTimeout(resolve, 4000))
       blockHeight = await connection.getBlockHeight("processed")
-    } catch (e) {
-      await new Promise((resolve) => setTimeout(resolve, 4000))
-    }
+    } catch (e) {}
   }
 
   return { txid }

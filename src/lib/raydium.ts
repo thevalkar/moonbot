@@ -72,7 +72,7 @@ export const buyRaydiumToken = async (
         poolKeys,
         "buy",
         amountInSol,
-        15
+        51
       )
 
       if (!ixsRes) {
@@ -137,6 +137,14 @@ export const buyRaydiumToken = async (
       tries++
       await new Promise((resolve) => setTimeout(resolve, 2500))
     }
+  }
+
+  if (!bought) {
+    console.log(
+      `${chalk.redBright(
+        "[SNIPING_BOT]"
+      )} Failed to buy ${tokenMint} for ${keypair.publicKey.toString()} | ${tries} tries | ${new Date().toUTCString()}`
+    )
   }
 }
 
@@ -376,7 +384,7 @@ export const getSwapInstructions = async (
         amount,
         currencyInMint,
         currencyOutMint,
-        slippage || swapType === "buy" ? 31 : 11
+        slippage || swapType === "buy" ? 51 : 11
       )
 
       if (Number(minAmountOut.toExact()) <= 0) {
@@ -404,7 +412,7 @@ export const getSwapInstructions = async (
           bypassAssociatedCheck: false,
         },
         computeBudgetConfig: {
-          microLamports: (feesInSol || 0.00015) * 10 ** 9,
+          microLamports: (feesInSol || 0.00025) * 10 ** 9,
         },
       })
 

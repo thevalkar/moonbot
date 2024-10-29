@@ -7,6 +7,7 @@ import {
   SlashCommandBuilder,
   REST,
   Routes,
+  ActivityType,
 } from "discord.js"
 import sql from "./lib/postgres"
 import { configDotenv } from "dotenv"
@@ -185,6 +186,14 @@ const connection = new Connection(heliusRpcUrl)
 //             name: "Q: How does Moonbot work?",
 //             value:
 //               "A: Simply deposit some SOL into your Moonbot wallet. Once deposited, type `/enable` in the Discord server and the bot will start sniping tokens automatically. Type `/enable` again to disable. The bot's algorithm handles both buying and selling of tokens without any manual intervention.",
+//           },
+//           {
+//             name: "Q: What is the recommended budget?",
+//             value: `A: Recommended budget: 1-2 SOL per week, or 0.15-0.3 SOL per day, to start.
+
+// The recommended budget is the amount of SOL you should deposit to your Moonbot wallet to snipe tokens. It is calculated based on the entry size and the average number of tokens the bot buys per day.
+
+// If you deposit less than the recommended amount, the bot will have less chance of profiting.`,
 //           },
 //           {
 //             name: "Q: What is the Moonbot wallet?",
@@ -599,5 +608,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 //         },
 //       },
 //     ],
+//   })
+// })
+
+// client.on(Events.ClientReady, async () => {
+//   console.log("Client ready")
+//   client.user?.setActivity({
+//     name: "Moonbot intern",
+//     type: ActivityType.Custom,
 //   })
 // })
