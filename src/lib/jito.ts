@@ -26,7 +26,7 @@ export async function sendJitoBundle(transactions: Uint8Array[]) {
 
   const randomTipAccount = await jitoClient.getRandomTipAccount()
   const jitoTipAccount = new PublicKey(randomTipAccount)
-  const jitoTipAmount = 0.0003 * LAMPORTS_PER_SOL
+  const jitoTipAmount = 0.0011 * LAMPORTS_PER_SOL
 
   const memoProgramId = new PublicKey(
     "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
@@ -34,11 +34,22 @@ export async function sendJitoBundle(transactions: Uint8Array[]) {
 
   const { blockhash } = await connection.getLatestBlockhash()
 
-  // Split transactions into batches of 5 tx per bundle
+  // Split transactions into batches
   const batchSize = 4
-
+  const batches = []
   for (let i = 0; i < base58EncodedTransactions.length; i += batchSize) {
     const batch = base58EncodedTransactions.slice(i, i + batchSize)
+    batches.push(batch)
+  }
+
+  const maxRetries = 3
+  let retryCount = 0
+  let pendingBatches = [...batches]
+
+  while (pendingBatches.length > 0 && retryCount < maxRetries) {
+    const currentBatch = pendingBatches.shift()
+
+    if (!currentBatch) continue
 
     const jitoTransaction = new Transaction()
     jitoTransaction.add(
@@ -68,42 +79,67 @@ export async function sendJitoBundle(transactions: Uint8Array[]) {
 
     try {
       const res = await jitoClient.sendBundle([
-        [base58EncodedJitoTransaction].concat(batch),
+        [base58EncodedJitoTransaction].concat(currentBatch),
       ])
 
       const bundleId = res.result
       console.log("Bundle ID:", bundleId)
+      ;(async () => {
+        try {
+          const inflightStatus = await jitoClient.confirmInflightBundle(
+            bundleId,
+            120000
+          )
+          console.log(
+            "Inflight bundle status:",
+            JSON.stringify(inflightStatus, null, 2)
+          )
+
+          if (inflightStatus.confirmation_status === "confirmed") {
+            console.log(
+              `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
+            )
+          } else {
+            throw new Error("Batch not confirmed. Retrying...")
+          }
+
+          if (
+            inflightStatus.confirmation_status !== "confirmed" &&
+            inflightStatus.err
+          ) {
+            throw new Error(
+              "Batch processing failed: " +
+                JSON.stringify(inflightStatus.err) +
+                ""
+            )
+          }
+        } catch (e: any) {
+          console.error("Error confirming batch:", e)
+          pendingBatches.push(currentBatch)
+        }
+      })()
     } catch (e: any) {
-      console.error("Error sending or confirming batch:", e)
+      console.error("Error sending batch:", e)
       if (e.response && e.response.data) {
         console.error("Server response:", e.response.data)
       }
+      // Re-add the batch to pending for retry
+      pendingBatches.push(currentBatch)
+
+      retryCount += 1
     } finally {
       await new Promise((resolve) => setTimeout(resolve, 1000))
     }
   }
 
-  // Wait for all batch promises to resolve
-  // const bundleIds = await Promise.all(batchPromises)
-  // console.log(bundleIds)
-  // for (const bundleId of bundleIds) {
-  //   const inflightStatus = await jitoClient.confirmInflightBundle(
-  //     bundleId,
-  //     120000
-  //   )
-  //   console.log(
-  //     "Inflight bundle status:",
-  //     JSON.stringify(inflightStatus, null, 2)
-  //   )
+  if (pendingBatches.length > 0) {
+    console.error(
+      `Failed to confirm ${pendingBatches.length} batch(es) after ${maxRetries} retries.`
+    )
+    throw new Error(
+      `Failed to confirm ${pendingBatches.length} batch(es) after ${maxRetries} retries.`
+    )
+  }
 
-  //   if (inflightStatus.confirmation_status === "confirmed") {
-  //     console.log(
-  //       `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
-  //     )
-  //   } else if (inflightStatus.err) {
-  //     console.log("Batch processing failed:", inflightStatus.err)
-  //   } else {
-  //     console.log("Unexpected inflight bundle status:", inflightStatus)
-  //   }
-  // }
+  console.log("All batches confirmed successfully.")
 }

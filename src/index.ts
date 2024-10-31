@@ -153,7 +153,8 @@ const onTransactionBuyAndSignalToken = async (
     if (uniqueBuyersCount >= BUYERS_AMOUNT_FOR_SIGNAL) {
       // @TODO: fdv below 5000 SOL or token age is below 48h
 
-      const shouldBuy = tokenFdv < 5000
+      const shouldBuy = false
+      // tokenFdv < 5000 && transactionSource === "Pumpfun"
 
       if (shouldBuy) {
         const codes = await sql<
@@ -183,7 +184,13 @@ const onTransactionBuyAndSignalToken = async (
         )
 
         if (txs.length > 0) {
-          await sendJitoBundle(txs)
+          ;(async () => {
+            try {
+              await sendJitoBundle(txs)
+            } catch (e) {
+              console.error("Error sending Jito bundle:", e)
+            }
+          })()
         }
       } else {
         const solanaPrice = await getSolanaPrice()
@@ -340,13 +347,13 @@ const getSnipeTransaction = async (
       }
     }
 
-    const dynamicEntrySize = walletBalance / 1e9 / 3 / 80
-    const amountToBuyInSol =
-      dynamicEntrySize < 0.005
-        ? 0.005
-        : dynamicEntrySize > 0.05
-        ? 0.05
-        : dynamicEntrySize
+    // const dynamicEntrySize = walletBalance / 1e9 / 3 / 80
+    const amountToBuyInSol = 0.005
+    // dynamicEntrySize < 0.005
+    //   ? 0.005
+    //   : dynamicEntrySize > 0.05
+    //   ? 0.05
+    //   : dynamicEntrySize
 
     console.log(
       `${chalk.greenBright(

@@ -412,7 +412,7 @@ export const getSwapInstructions = async (
           bypassAssociatedCheck: false,
         },
         computeBudgetConfig: {
-          microLamports: (feesInSol || 0.00025) * 10 ** 9,
+          microLamports: (feesInSol || 0.00011) * 10 ** 9,
         },
       })
 
