@@ -137,7 +137,7 @@ const onTransactionBuyAndSignalToken = async (
       chalk.green(`Potential mooner detected (${uniqueBuyersCount} buyers)`),
       `${tokenMint}`,
 
-      transactionSource === "Raydium" || transactionSource === "Moonshot"
+      transactionSource === "Raydium"
         ? `https://dexscreener.com/solana/${tokenMint}`
         : `https://pump.fun/${tokenMint}`,
       ` https://solscan.io/tx/${`${transaction.signature}`}`,
@@ -208,7 +208,13 @@ const onTransactionBuyAndSignalToken = async (
         )
       }
 
-      const token = await insertToken(tokenMint, tokenData, tokenPairAddress)
+      const token = await insertToken(
+        tokenMint,
+        tokenData,
+        tokenPairAddress,
+        transactionSource,
+        data.tokenPumpfunBondingCurveAta
+      )
 
       const signals = await getTokenSignals(tokenMint)
       const signalExists = signals.length > 0
@@ -298,7 +304,7 @@ const getSnipeTransaction = async (
     tokenPairAddress,
     transactionSource,
     tokenPumpfunGlobalAddress,
-    tokenPumpfunBondingCurveAtaAddress,
+    tokenPumpfunBondingCurveAta,
   } = data
   const walletBalance = await connection.getBalance(keypair.publicKey)
 
@@ -377,7 +383,7 @@ const getSnipeTransaction = async (
         keypair,
         new PublicKey(tokenMint),
         new PublicKey(tokenPairAddress),
-        new PublicKey(tokenPumpfunBondingCurveAtaAddress!),
+        new PublicKey(tokenPumpfunBondingCurveAta!),
         new PublicKey(tokenPumpfunGlobalAddress!),
         amountToBuyInSol
       )
@@ -496,13 +502,13 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
   if (isSell || !isBuy) return null
   if (!tokenMint) throw new Error("No token mint found")
 
-  let transactionSource,
+  let transactionSource: "Pumpfun" | "Raydium",
     tokenVault,
     tokenPairAddress,
     tokenLiquidity,
     tokenRaydiumPoolKeys,
     tokenPumpfunGlobalAddress,
-    tokenPumpfunBondingCurveAtaAddress
+    tokenPumpfunBondingCurveAta
   if (isPumpFun) {
     const pumpFunIx = getTransactionInstructionByProgramId(
       transaction,
@@ -519,7 +525,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
     transactionSource = "Pumpfun"
     tokenPairAddress = pumpFunIx.accounts[3]
     tokenPumpfunGlobalAddress = pumpFunIx.accounts[0]
-    tokenPumpfunBondingCurveAtaAddress = pumpFunIx.accounts[4]
+    tokenPumpfunBondingCurveAta = pumpFunIx.accounts[4]
     tokenVault = tokenPairAddress
   } else if (isRaydium) {
     const raydiumIx = getTransactionInstructionByProgramId(
@@ -543,26 +549,27 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
       await fetchPoolAndMarketAccounts(connection, tokenPairAddress)
     ).poolKeys
   } else if (isMoonShot) {
-    const moonshotIx = getTransactionInstructionByProgramId(
-      transaction,
-      MOONSHOT_PROGRAM_ID
-    )
-    if (!moonshotIx) {
-      throw new Error(
-        "Transaction is Moonshot, but no Moonshot instruction found " +
-          ` https://solscan.io/tx/${transaction.signature}`
-      )
-    }
+    return null
+    // const moonshotIx = getTransactionInstructionByProgramId(
+    //   transaction,
+    //   MOONSHOT_PROGRAM_ID
+    // )
+    // if (!moonshotIx) {
+    //   throw new Error(
+    //     "Transaction is Moonshot, but no Moonshot instruction found " +
+    //       ` https://solscan.io/tx/${transaction.signature}`
+    //   )
+    // }
 
-    console.log(
-      chalk.yellowBright("moonshot found") +
-        ` https://solscan.io/tx/${transaction.signature}`
-    )
-    tokenVault = moonshotIx.accounts[3]
-    tokenPairAddress = tokenVault
-    transactionSource = "Moonshot"
-    tokenLiquidity =
-      (await connection.getBalance(new PublicKey(tokenVault))) / 1e9
+    // console.log(
+    //   chalk.yellowBright("moonshot found") +
+    //     ` https://solscan.io/tx/${transaction.signature}`
+    // )
+    // tokenVault = moonshotIx.accounts[3]
+    // tokenPairAddress = tokenVault
+    // transactionSource = "Moonshot"
+    // tokenLiquidity =
+    //   (await connection.getBalance(new PublicKey(tokenVault))) / 1e9
   } else {
     return null
   }
@@ -607,7 +614,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
     tokenData: asset,
     tokenRaydiumPoolKeys,
     tokenPumpfunGlobalAddress,
-    tokenPumpfunBondingCurveAtaAddress,
+    tokenPumpfunBondingCurveAta,
   }
 }
 

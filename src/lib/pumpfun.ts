@@ -40,7 +40,7 @@ const program = new Program(
 const feeRecipient = "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
 const EVENT_AUTH = "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1"
 
-const priorityFee = 0.00011 * LAMPORTS_PER_SOL
+const priorityFee = 0.000011 * LAMPORTS_PER_SOL
 
 const globalState = new PublicKey(
   "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf"

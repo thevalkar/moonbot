@@ -220,16 +220,18 @@ export const insertTokenPrice = async (
 export const insertToken = async (
   mint: string,
   data: DigitalAsset | null = null,
-  pairAddress: string
+  pairAddress: string,
+  pairSource: "Raydium" | "Pumpfun",
+  tokenPumpfunBondingCurveAta: string | null = null
 ) => {
   const res = await sql<
     TokenSqlRow[]
-  >`INSERT INTO tokens (mint, data, pair_address) VALUES(${mint}, ${
+  >`INSERT INTO tokens (mint, data, pair_address, pair_source, pumpfun_bonding_curve_ata) VALUES(${mint}, ${
     data as never
-  }, ${pairAddress})
-    ON CONFLICT (mint) DO UPDATE SET pair_address = ${pairAddress}, data = ${
-    data as never
-  }
+  }, ${pairAddress}, ${pairSource}, ${tokenPumpfunBondingCurveAta})
+    ON CONFLICT (mint) DO UPDATE SET pair_address = ${pairAddress}, pair_source = ${pairSource}, ${
+    data ? sql`data = ${data as never},` : sql``
+  } pumpfun_bonding_curve_ata = ${tokenPumpfunBondingCurveAta}
   RETURNING *`
 
   return res[0]
