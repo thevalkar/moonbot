@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "NODE_ENV=production PORT=3000 tsx src/index.ts & tsx src/discord.ts",
+    "start": "NODE_ENV=production tsx src/index.ts & tsx src/discord.ts",
     "dev": "tsx src/index.ts & tsx src/discord.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -32,7 +32,6 @@
     "vercel": "^37.6.0"
   },
   "devDependencies": {
-    "@flydotio/dockerfile": "^0.5.9",
     "@types/bn.js": "^5.1.6",
     "@types/express": "^4.17.21",
     "typescript": "^5.6.2"

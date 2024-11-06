@@ -4,6 +4,7 @@ import { Connection, PublicKey, Keypair } from "@solana/web3.js"
 import { Bot } from "grammy"
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor"
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet"
+import {readFileSync} from 'fs'
 
 import examplePumpfun from "@/data/example-pumpfun-swap.json"
 
@@ -33,7 +34,7 @@ import { getBuyPumpfunTokenTransaction } from "@/lib/pumpfun"
 import { io } from "socket.io-client"
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes"
 import { decrypt } from "@/lib/utils"
-import { createServer } from "http"
+import { createServer } from "https"
 import { configDotenv } from "dotenv"
 import { sendJitoBundle } from "./lib/jito"
 configDotenv()
@@ -400,7 +401,12 @@ const getSnipeTransaction = async (
 }
 
 const expressApp = express().use(express.json())
-const server = createServer(expressApp)
+
+const options = {
+  key: readFileSync(process.env.HTTPS_KEY_PATH as string),
+  cert: readFileSync(process.env.HTTPS_CERT_PATH as string)
+};
+const server = createServer(options, expressApp)
 
 const socketConnection = io(process.env.WEBSOCKET_URL as string, {
   // secure: true,
@@ -424,7 +430,7 @@ expressApp.post("/", async (req, res) => {
   }
 })
 
-const port = process.env.PORT || 45001
+const port = process.env.API_PORT || 443
 server.listen(port, () => console.log(`App is running on port ${port}`))
 
 socketConnection.on("connection", (socket) => {
