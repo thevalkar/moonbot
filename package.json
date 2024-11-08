@@ -27,7 +27,7 @@
     "grammy": "^1.30.0",
     "jito-js-rpc": "^0.1.0",
     "postgres": "^3.4.4",
-    "socket.io-client": "^4.8.0",
+    "socket.io": "^4.8.1",
     "tsx": "^4.19.1",
     "vercel": "^37.6.0"
   },

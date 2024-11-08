@@ -4,7 +4,7 @@ import { Connection, PublicKey, Keypair } from "@solana/web3.js"
 import { Bot } from "grammy"
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor"
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet"
-import {readFileSync} from 'fs'
+import { readFileSync } from 'fs'
 
 import examplePumpfun from "@/data/example-pumpfun-swap.json"
 
@@ -31,12 +31,12 @@ import sql, {
 } from "./lib/postgres"
 import idl from "@/data/pumpfun-idl.json"
 import { getBuyPumpfunTokenTransaction } from "@/lib/pumpfun"
-import { io } from "socket.io-client"
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes"
 import { decrypt } from "@/lib/utils"
 import { createServer } from "https"
 import { configDotenv } from "dotenv"
 import { sendJitoBundle } from "./lib/jito"
+import { Server } from "socket.io"
 configDotenv()
 
 const isSignaling: {
@@ -185,7 +185,7 @@ const onTransactionBuyAndSignalToken = async (
         )
 
         if (txs.length > 0) {
-          ;(async () => {
+          ; (async () => {
             try {
               await sendJitoBundle(txs)
             } catch (e) {
@@ -408,17 +408,14 @@ const options = {
 };
 const server = createServer(options, expressApp)
 
-const socketConnection = io(process.env.WEBSOCKET_URL as string, {
-  // secure: true,
-  // transports: ["websocket"],
-  // extraHeaders: {
-  //   "ngrok-skip-browser-warning": "true",
-  // },
+const socketConnection = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 })
 
-socketConnection.on("connect", () => {
-  console.log("Connected to socket server")
-})
+
 
 expressApp.post("/", async (req, res) => {
   try {
@@ -433,9 +430,7 @@ expressApp.post("/", async (req, res) => {
 const port = process.env.API_PORT || 443
 server.listen(port, () => console.log(`App is running on port ${port}`))
 
-socketConnection.on("connection", (socket) => {
-  console.log("a user connected")
-})
+
 const connection = new Connection(heliusRpcUrl, {
   confirmTransactionInitialTimeout: 1 * 80 * 1000,
   commitment: "processed",
@@ -492,7 +487,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
   ) {
     console.log(
       chalk.red("Transaction is not Raydium, PumpFun, Jup or Moonshot") +
-        ` https://solscan.io/tx/${transaction.signature}`
+      ` https://solscan.io/tx/${transaction.signature}`
     )
     return null
   }
@@ -524,7 +519,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
     if (!pumpFunIx) {
       throw new Error(
         "Transaction is PumpFun, but no PumpFun instruction found " +
-          ` https://solscan.io/tx/${transaction.signature}`
+        ` https://solscan.io/tx/${transaction.signature}`
       )
     }
 
@@ -542,7 +537,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
     if (!raydiumIx) {
       throw new Error(
         "Transaction is Raydium, but no Raydium instruction found " +
-          ` https://solscan.io/tx/${transaction.signature}`
+        ` https://solscan.io/tx/${transaction.signature}`
       )
     }
 
@@ -582,7 +577,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
   if (!price) {
     throw new Error(
       "Token price not found " +
-        ` https://solscan.io/tx/${transaction.signature}`
+      ` https://solscan.io/tx/${transaction.signature}`
     )
   }
   const {
@@ -685,35 +680,31 @@ const getSocialsSignalMessage = async (
   }
 
   return `
-  ${isSniped ? "🟢" : "⚪"} $\`${tokenData.metadata.symbol}\` \\(\`${
-    tokenData.metadata.name
-  }\`\\) bought by the cabal on ${transactionSource}
+  ${isSniped ? "🟢" : "⚪"} $\`${tokenData.metadata.symbol}\` \\(\`${tokenData.metadata.name
+    }\`\\) bought by the cabal on ${transactionSource}
   
   \`${tokenData.mint.publicKey.toString()}\`
   
   📈 Price: $\`${priceInUsd.toFixed(7)}\`
   💰 MC: \`${Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(marketCapInUsd)}\`
+      style: "currency",
+      currency: "USD",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(marketCapInUsd)}\`
   ────────────
   ℹ️ Renounced: ${tokenIsRenounced ? "☑️ Yes" : "⚠️ No"}
-  ℹ️ Top 5 holders: ${
-    isTopFiveGood ? "☑️" : "⚠️"
-  } ${tokenTopFiveHoldersPercentage.toFixed(0)}% \\(${
-    isTopFiveGood ? "Good" : "High"
-  }\\)
+  ℹ️ Top 5 holders: ${isTopFiveGood ? "☑️" : "⚠️"
+    } ${tokenTopFiveHoldersPercentage.toFixed(0)}% \\(${isTopFiveGood ? "Good" : "High"
+    }\\)
   ${
     //   `ℹ️ LP supply: ${isLpPercentageGood ? "☑️" : "⚠️"} ${
     //   tokenLpPercentage ? tokenLpPercentage?.toFixed(0) : "Low"
     // }% \\(${isLpPercentageGood ? "Good" : "low"}\\)`
     ``
-  }
-  🔗 [[${
-    sourceName === "Raydium" ? "DexScreener" : sourceName
-  }]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
+    }
+  🔗 [[${sourceName === "Raydium" ? "DexScreener" : sourceName
+    }]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
 }
 const sendSocialsNotification = async (
   data: Exclude<
