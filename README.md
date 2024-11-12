@@ -99,7 +99,30 @@ Before setting up Moonbot, ensure you have the following:
    cp .env.template .env
    ```
 
-   Populate the `.env` file with your configuration
+   Populate the `.env` file with your configuration:
+
+   ```env
+    KEYPAIR_ENCRYPTION_KEY=
+    KEYPAIR_ENCRYPTION_IV=
+    DATABASE_URL=postgres://postgres:password@localhost:5432/database
+    DISCORD_BOT_TOKEN=
+    TELEGRAM_BOT_TOKEN=
+    HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=api_key
+    JITO_PAYER_KEYPAIR=[...,...,...]
+    API_PORT=443
+    HTTPS_KEY_PATH=/etc/letsencrypt/archive/server.com/privkey1.pem
+    HTTPS_CERT_PATH=/etc/letsencrypt/archive/server.com/fullchain1.pem
+   ```
+   - **KEYPAIR_ENCRYPTION_KEY:** Hex-encoded key for encrypting keypairs.
+   - **KEYPAIR_ENCRYPTION_IV:** Hex-encoded initialization vector for encryption.
+   - **DATABASE_URL:** PostgreSQL connection string.
+   - **DISCORD_BOT_TOKEN:** Token for Discord bot integration.
+   - **TELEGRAM_BOT_TOKEN:** Token for Telegram bot integration.
+   - **HELIUS_RPC_URL:** RPC endpoint for Solana interactions.
+   - **JITO_PAYER_KEYPAIR:** Jito payer keypair for sending bundles.
+   - **API_PORT:** Port to run the API
+   - **HTTPS_KEY_PATH:** Absolute path for HTTPS cert key
+   - **HTTPS_CERT_PATH:** Absolute path for HTTPS cert
 
 2. **Configure Discord Bot**
 
