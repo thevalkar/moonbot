@@ -13,7 +13,7 @@ import {
 import { PUMPFUN_PROGRAM_ID, heliusRpcUrl } from "./utils"
 
 import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor"
-import idl from "@/data/pumpfun-idl.json"
+import idl from "../data/pumpfun-idl.json"
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet"
 import {
   TOKEN_PROGRAM_ID,

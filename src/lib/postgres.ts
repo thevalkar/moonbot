@@ -3,7 +3,9 @@ import postgres from "postgres"
 import { DigitalAsset } from "@metaplex-foundation/mpl-token-metadata"
 import dotenv from "dotenv"
 
-dotenv.config()
+dotenv.config({
+  path: '/root/workspace/moonbot/.env'
+})
 
 export const sql = postgres(process.env.DATABASE_URL as string)
 
@@ -58,6 +60,7 @@ export type SignalWithEntry = {
   entry_buyer: string
   entry_source: string
 }
+
 
 export const getSignals = async (maxHoursOld = 24) => {
   console.time("signals query")
@@ -134,8 +137,8 @@ export const getSignals = async (maxHoursOld = 24) => {
 export const getTokens = async (mints?: string[]) => {
   const tokens: TokenSqlRow[] = mints
     ? await sql`SELECT mint, data, pair_address FROM tokens WHERE mint in ${sql(
-        mints
-      )}`
+      mints
+    )}`
     : await sql`SELECT mint, data, pair_address FROM tokens`
 
   return tokens
@@ -166,9 +169,8 @@ export const insertTokenSignal = async (
 ) => {
   const res = await sql<Signal[]>`
     INSERT INTO token_signals (token_mint, price, pair_address, timestamp, source, buyers, buyer, amount)
-    VALUES (${mint}, ${price}, ${pair}, ${timestamp}, ${source}, ${buyers}, ${buyer}, ${
-    amount || null
-  })
+    VALUES (${mint}, ${price}, ${pair}, ${timestamp}, ${source}, ${buyers}, ${buyer}, ${amount || null
+    })
   RETURNING *
   `
   return res
@@ -196,9 +198,8 @@ export const insertTokenEntry = async (
   }
 ) => {
   const res =
-    await sql`INSERT INTO token_entries (token_mint, buyer, price, amount, timestamp, source, token_insights) VALUES(${mint}, ${buyer}, ${price},${
-      amount || null
-    }, ${timestamp},${source},${tokenInsights as never})
+    await sql`INSERT INTO token_entries (token_mint, buyer, price, amount, timestamp, source, token_insights) VALUES(${mint}, ${buyer}, ${price},${amount || null
+      }, ${timestamp},${source},${tokenInsights as never})
     RETURNING *`
 
   return res[0]
@@ -226,12 +227,10 @@ export const insertToken = async (
 ) => {
   const res = await sql<
     TokenSqlRow[]
-  >`INSERT INTO tokens (mint, data, pair_address, pair_source, pumpfun_bonding_curve_ata) VALUES(${mint}, ${
-    data as never
+  >`INSERT INTO tokens (mint, data, pair_address, pair_source, pumpfun_bonding_curve_ata) VALUES(${mint}, ${data as never
   }, ${pairAddress}, ${pairSource}, ${tokenPumpfunBondingCurveAta})
-    ON CONFLICT (mint) DO UPDATE SET pair_address = ${pairAddress}, pair_source = ${pairSource}, ${
-    data ? sql`data = ${data as never},` : sql``
-  } pumpfun_bonding_curve_ata = ${tokenPumpfunBondingCurveAta}
+    ON CONFLICT (mint) DO UPDATE SET pair_address = ${pairAddress}, pair_source = ${pairSource}, ${data ? sql`data = ${data as never},` : sql``
+    } pumpfun_bonding_curve_ata = ${tokenPumpfunBondingCurveAta}
   RETURNING *`
 
   return res[0]
@@ -243,9 +242,8 @@ export const insertPair = async (
   tokenMint: string,
   data: unknown = null
 ) => {
-  const res = sql`INSERT INTO pairs (address, source, token_mint, data) VALUES(${address}, ${source}, ${tokenMint}, ${
-    data as never
-  })
+  const res = sql`INSERT INTO pairs (address, source, token_mint, data) VALUES(${address}, ${source}, ${tokenMint}, ${data as never
+    })
 
   RETURNING *`
 

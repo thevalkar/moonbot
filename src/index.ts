@@ -739,7 +739,7 @@ const sendSocialsNotification = async (
   try {
     await sendDiscordMessage(msg, discordChannel, data.tokenData)
   } catch (e) {
-    console.error("Couldn't send Discord message" + e)
+    console.error("Couldn't send Discord message " + e + JSON.stringify(msg) + JSON.stringify(data.tokenData) + new Date().toLocaleString())
   }
 }
 

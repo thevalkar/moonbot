@@ -99,27 +99,7 @@ Before setting up Moonbot, ensure you have the following:
    cp .env.template .env
    ```
 
-   Populate the `.env` file with your configuration:
-
-   ```env
-   KEYPAIR_ENCRYPTION_KEY=your_encryption_key_in_hex
-   KEYPAIR_ENCRYPTION_IV=your_initialization_vector_in_hex
-   DATABASE_URL=postgres://username:password@localhost:5432/moonbot_db
-   DISCORD_BOT_TOKEN=your_discord_bot_token
-   TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-   HELIUS_RPC_URL=https://api.helius.xyz/v0/
-   WEBSOCKET_URL=wss://your-websocket-server.com
-   PORT=45000
-   ```
-
-   - **KEYPAIR_ENCRYPTION_KEY:** Hex-encoded key for encrypting keypairs.
-   - **KEYPAIR_ENCRYPTION_IV:** Hex-encoded initialization vector for encryption.
-   - **DATABASE_URL:** PostgreSQL connection string.
-   - **DISCORD_BOT_TOKEN:** Token for Discord bot integration.
-   - **TELEGRAM_BOT_TOKEN:** Token for Telegram bot integration.
-   - **HELIUS_RPC_URL:** RPC endpoint for Solana interactions.
-   - **WEBSOCKET_URL:** WebSocket server URL for real-time transactions.
-   - **PORT:** Port number for the Express server (default is 45000).
+   Populate the `.env` file with your configuration
 
 2. **Configure Discord Bot**
 

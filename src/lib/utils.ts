@@ -17,11 +17,7 @@ import {
   TokenAmount,
   VersionedTransaction,
 } from "@solana/web3.js"
-import {
-  SOL_MINT,
-  calcAmountOut,
-  fetchPoolAndMarketAccounts,
-} from "@/lib/raydium"
+
 import {
   jsonInfo2PoolKeys,
   LIQUIDITY_STATE_LAYOUT_V4,
@@ -44,7 +40,10 @@ import chalk from "chalk"
 import { token } from "@coral-xyz/anchor/dist/cjs/utils"
 import crypto from "crypto"
 import dotenv from "dotenv"
-dotenv.config()
+import { SOL_MINT } from "./raydium"
+dotenv.config({
+  path: '/root/workspace/moonbot/.env'
+})
 
 export const PUMPFUN_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 export const RAYDIUM_PROGRAM_ID = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
@@ -947,7 +946,7 @@ export const sendAndRetryTransaction = async (
       .then(() => {
         confirmed = true
       })
-      .catch((e) => {})
+      .catch((e) => { })
   } catch (e) {
     console.error(e)
 
@@ -966,7 +965,7 @@ export const sendAndRetryTransaction = async (
         // maxRetries: 0,
       })
       blockHeight = await connection.getBlockHeight("processed")
-    } catch (e) {}
+    } catch (e) { }
   }
 
   return { txid }
