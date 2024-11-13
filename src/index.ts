@@ -8,7 +8,7 @@ import { readFileSync } from 'fs'
 
 import examplePumpfun from "@/data/example-pumpfun-swap.json"
 
-import { buyRaydiumToken, fetchPoolAndMarketAccounts } from "@/lib/raydium"
+import { getBuyRaydiumTokenTransaction, fetchPoolAndMarketAccounts } from "@/lib/raydium"
 import {
   MOONSHOT_PROGRAM_ID,
   PUMPFUN_PROGRAM_ID,
@@ -152,10 +152,7 @@ const onTransactionBuyAndSignalToken = async (
       transactionSource === "Raydium" ? MIN_BUYERS_RAYDIUM : MIN_BUYERS_PUMPFUN
 
     if (uniqueBuyersCount >= BUYERS_AMOUNT_FOR_SIGNAL) {
-      // @TODO: fdv below 5000 SOL or token age is below 48h
-
-      const shouldBuy = false
-      // tokenFdv < 5000 && transactionSource === "Pumpfun"
+      const shouldBuy = tokenFdv < 5000
 
       if (shouldBuy) {
         const codes = await sql<
@@ -169,6 +166,7 @@ const onTransactionBuyAndSignalToken = async (
 
         const promises = codes.map(async ({ keypair, code, enabled }) => {
           if (!enabled) return null
+
           try {
             const decrypted = await decrypt(keypair)
             if (!decrypted) throw new Error("Decryption failed for " + code)
@@ -181,7 +179,7 @@ const onTransactionBuyAndSignalToken = async (
         })
 
         const txs = (await Promise.all(promises)).filter(
-          (tx): tx is Uint8Array => tx !== undefined && tx !== null
+          (tx): tx is Uint8Array => tx !== undefined && tx !== null && !!tx
         )
 
         if (txs.length > 0) {
@@ -355,7 +353,7 @@ const getSnipeTransaction = async (
     }
 
     // const dynamicEntrySize = walletBalance / 1e9 / 3 / 80
-    const amountToBuyInSol = 0.005
+    const amountToBuyInSol = 0.01
     // dynamicEntrySize < 0.005
     //   ? 0.005
     //   : dynamicEntrySize > 0.05
@@ -369,15 +367,16 @@ const getSnipeTransaction = async (
     )
 
     if (transactionSource === "Raydium") {
-      // const res = await buyRaydiumToken(
-      //   sniperConnection,
-      //   keypair,
-      //   tokenMint,
-      //   tokenPairAddress,
-      //   amountToBuyInSol,
-      //   tokenRaydiumPoolKeys
-      // )
-      // console.log(res)
+      const tx = await getBuyRaydiumTokenTransaction(
+        connection,
+        keypair,
+        tokenMint,
+        tokenPairAddress,
+        amountToBuyInSol,
+        tokenRaydiumPoolKeys
+      )
+
+      return tx
     } else if (transactionSource === "Pumpfun") {
       const pumpfunTx = await getBuyPumpfunTokenTransaction(
         connection,

@@ -23,7 +23,7 @@ import {
 import { getWalletTokenBalance, sendAndRetryTransaction } from "./utils"
 import chalk from "chalk"
 
-export const buyRaydiumToken = async (
+export const getBuyRaydiumTokenTransaction = async (
   connection: Connection,
   keypair: Keypair,
   tokenMint: string,
@@ -31,9 +31,9 @@ export const buyRaydiumToken = async (
   amountInSol: number = 0.01,
   poolKeys?: Awaited<ReturnType<typeof fetchPoolAndMarketAccounts>>["poolKeys"]
 ) => {
-  let bought = false
   let tries = 1
-  while (!bought && tries < 5) {
+
+  while (tries < 5) {
     try {
       const balance = await getWalletTokenBalance(
         connection,
@@ -42,7 +42,7 @@ export const buyRaydiumToken = async (
       )
 
       if (balance?.value.uiAmount) {
-        bought = true
+        console.log(`Wallet ${keypair.publicKey.toString()} already has balance for ${tokenMint}`)
         break
       }
 
@@ -56,7 +56,7 @@ export const buyRaydiumToken = async (
 
         if (!poolKeys) {
           console.error("Couldn't find pool keys or info.")
-          return true
+          return false
         }
       }
 
@@ -87,9 +87,9 @@ export const buyRaydiumToken = async (
 
       // ix to transfer moonbot fees
       // create account first if no balance
-      const feesWallet = new PublicKey(
-        "9rAtMfHKvAobdwyoNYNZg4c63fUVVLJushVPMymv8iRc"
-      )
+      // const feesWallet = new PublicKey(
+      //   "9rAtMfHKvAobdwyoNYNZg4c63fUVVLJushVPMymv8iRc"
+      // )
 
       // ixs.push(
       //   SystemProgram.transfer({
@@ -108,43 +108,11 @@ export const buyRaydiumToken = async (
 
       versionedTransaction.sign([keypair])
 
-      const txid = await connection.sendRawTransaction(
-        versionedTransaction.serialize(),
-        {
-          skipPreflight: true,
-          preflightCommitment: "processed",
-          // minContextSlot: latestBlockHash.context.slot,
-          // maxRetries: 0,
-        }
-      )
-
-      sendAndRetryTransaction(connection, versionedTransaction, latestBlockHash)
-
-      await connection.confirmTransaction(txid, "processed")
-
-      bought = true
-
-      console.log(
-        `${chalk.yellowBright(
-          "[SNIPING_BOT]"
-        )} Bought ${tokenMint} for ${keypair.publicKey.toString()} | https://solscan.io/tx/${txid} | ${new Date().toUTCString()}`
-      )
-
-      return txid
+      return versionedTransaction.serialize()
     } catch (e) {
       console.log(e)
-    } finally {
       tries++
-      await new Promise((resolve) => setTimeout(resolve, 2500))
     }
-  }
-
-  if (!bought) {
-    console.log(
-      `${chalk.redBright(
-        "[SNIPING_BOT]"
-      )} Failed to buy ${tokenMint} for ${keypair.publicKey.toString()} | ${tries} tries | ${new Date().toUTCString()}`
-    )
   }
 }
 
@@ -153,7 +121,7 @@ export const fetchPoolAndMarketAccounts = async (
   poolId: string
 ) => {
   let pool: ReturnType<typeof LIQUIDITY_STATE_LAYOUT_V4.decode> | undefined =
-      undefined,
+    undefined,
     market: MarketData | undefined = undefined
   let error: boolean | string = true
   let retries = 0

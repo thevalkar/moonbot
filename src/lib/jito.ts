@@ -17,7 +17,7 @@ const connection = new Connection(heliusRpcUrl)
 const payerKeypair = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))
 )
-export async function sendJitoBundle(transactions: Uint8Array[]) {
+export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountInSol = 0.0011) {
   const base58EncodedTransactions = transactions.map((tx) => bs58.encode(tx))
   const jitoClient = new JitoJsonRpcClient(
     "https://mainnet.block-engine.jito.wtf/api/v1",
@@ -26,7 +26,7 @@ export async function sendJitoBundle(transactions: Uint8Array[]) {
 
   const randomTipAccount = await jitoClient.getRandomTipAccount()
   const jitoTipAccount = new PublicKey(randomTipAccount)
-  const jitoTipAmount = 0.0011 * LAMPORTS_PER_SOL
+  const jitoTipAmount = jitoTipAmountInSol * LAMPORTS_PER_SOL
 
   const memoProgramId = new PublicKey(
     "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
@@ -84,40 +84,35 @@ export async function sendJitoBundle(transactions: Uint8Array[]) {
 
       const bundleId = res.result
       console.log("Bundle ID:", bundleId)
-      ;(async () => {
-        try {
-          const inflightStatus = await jitoClient.confirmInflightBundle(
-            bundleId,
-            120000
-          )
-          console.log(
-            "Inflight bundle status:",
-            JSON.stringify(inflightStatus, null, 2)
-          )
-
-          if (inflightStatus.confirmation_status === "confirmed") {
-            console.log(
-              `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
+        ; (async () => {
+          try {
+            const inflightStatus = await jitoClient.confirmInflightBundle(
+              bundleId,
+              120000
             )
-          } else {
-            throw new Error("Batch not confirmed. Retrying...")
-          }
 
-          if (
-            inflightStatus.confirmation_status !== "confirmed" &&
-            inflightStatus.err
-          ) {
-            throw new Error(
-              "Batch processing failed: " +
-                JSON.stringify(inflightStatus.err) +
-                ""
-            )
+
+            if (inflightStatus.confirmation_status === "confirmed") {
+              console.log(
+                `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
+              )
+
+              return bundleId
+            } else {
+              if (inflightStatus.err
+              ) {
+                throw new Error(
+                  "Batch processing failed: " +
+                  JSON.stringify(inflightStatus.err) +
+                  ""
+                )
+              }
+            }
+          } catch (e: any) {
+            console.error("Error confirming batch:", e)
+            pendingBatches.push(currentBatch)
           }
-        } catch (e: any) {
-          console.error("Error confirming batch:", e)
-          pendingBatches.push(currentBatch)
-        }
-      })()
+        })()
     } catch (e: any) {
       console.error("Error sending batch:", e)
       if (e.response && e.response.data) {

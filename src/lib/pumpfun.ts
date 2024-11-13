@@ -214,7 +214,7 @@ export const getBuyPumpfunTokenTransaction = async (
   }
 }
 
-export const sellPumpfunToken = async (
+export const getSellPumpfunTokenTransaction = async (
   connection: Connection,
   keypair: Keypair,
   tokenMint: PublicKey,
@@ -223,11 +223,9 @@ export const sellPumpfunToken = async (
   globalState: PublicKey,
   amount: number
 ) => {
-  let sold = false
   let tries = 1
-  let txid: string | undefined
 
-  while (!sold && tries <= 1) {
+  while (tries <= 5) {
     try {
       const user = keypair.publicKey
       const userAta = getAssociatedTokenAddressSync(tokenMint, user, true)
@@ -318,14 +316,7 @@ export const sellPumpfunToken = async (
         )} Attempt ${tries} to sell ${tokenMint} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
       )
 
-      // const txid = await helius.rpc.sendSmartTransaction(
-      //   ixs,
-      //   [keypair],
-      //   undefined,
-      //   {
-      //     skipPreflight: true,
-      //   }
-      // )
+
 
       let latestBlockHash = await connection.getLatestBlockhashAndContext(
         "processed"
@@ -340,36 +331,12 @@ export const sellPumpfunToken = async (
 
       versionedTransaction.sign([keypair])
 
-      txid = await connection.sendRawTransaction(
-        versionedTransaction.serialize(),
-        {
-          skipPreflight: true,
-          preflightCommitment: "processed",
-          minContextSlot: latestBlockHash.context.slot,
-          // maxRetries: 0,
-        }
-      )
-
-      // sendAndRetryTransaction(connection, versionedTransaction, latestBlockHash)
-
-      await connection.confirmTransaction(txid, "processed")
-
-      sold = true
-
-      console.log(
-        `${chalk.yellowBright(
-          "[SNIPING_BOT]"
-        )} Sold ${tokenMint} for ${keypair.publicKey.toString()} | https://solscan.io/tx/${txid} | ${new Date().toUTCString()}`
-      )
+      return versionedTransaction.serialize()
     } catch (e) {
       console.log(e)
-    } finally {
       tries++
-      await new Promise((resolve) => setTimeout(resolve, 2500))
     }
   }
-
-  return txid
 }
 
 export function getRandomNumber() {
