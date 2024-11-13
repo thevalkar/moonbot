@@ -24,7 +24,7 @@ export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountIn
     ""
   )
 
-  const randomTipAccount = await jitoClient.getRandomTipAccount()
+  const randomTipAccount = "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49"
   const jitoTipAccount = new PublicKey(randomTipAccount)
   const jitoTipAmount = jitoTipAmountInSol * LAMPORTS_PER_SOL
 
@@ -42,14 +42,7 @@ export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountIn
     batches.push(batch)
   }
 
-  const maxRetries = 3
-  let retryCount = 0
-  let pendingBatches = [...batches]
-
-  while (pendingBatches.length > 0 && retryCount < maxRetries) {
-    const currentBatch = pendingBatches.shift()
-
-    if (!currentBatch) continue
+  batches.map(async batch => {
 
     const jitoTransaction = new Transaction()
     jitoTransaction.add(
@@ -79,62 +72,40 @@ export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountIn
 
     try {
       const res = await jitoClient.sendBundle([
-        [base58EncodedJitoTransaction].concat(currentBatch),
+        [base58EncodedJitoTransaction].concat(batch),
       ])
 
       const bundleId = res.result
       console.log("Bundle ID:", bundleId)
-        ; (async () => {
-          try {
-            const inflightStatus = await jitoClient.confirmInflightBundle(
-              bundleId,
-              120000
-            )
+      const inflightStatus = await jitoClient.confirmInflightBundle(
+        bundleId,
+        15000
+      )
 
+      if (inflightStatus.status === "Landed") {
+        console.log(
+          `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
+        )
 
-            if (inflightStatus.confirmation_status === "confirmed") {
-              console.log(
-                `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
-              )
+        return bundleId
+      } else {
+        console.log(inflightStatus)
 
-              return bundleId
-            } else {
-              if (inflightStatus.err
-              ) {
-                throw new Error(
-                  "Batch processing failed: " +
-                  JSON.stringify(inflightStatus.err) +
-                  ""
-                )
-              }
-            }
-          } catch (e: any) {
-            console.error("Error confirming batch:", e)
-            pendingBatches.push(currentBatch)
-          }
-        })()
+        throw new Error(
+          "Batch processing failed: " +
+          JSON.stringify(inflightStatus) +
+          ""
+        )
+      }
+
     } catch (e: any) {
       console.error("Error sending batch:", e)
       if (e.response && e.response.data) {
         console.error("Server response:", e.response.data)
       }
-      // Re-add the batch to pending for retry
-      pendingBatches.push(currentBatch)
 
-      retryCount += 1
-    } finally {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
     }
-  }
-
-  if (pendingBatches.length > 0) {
-    console.error(
-      `Failed to confirm ${pendingBatches.length} batch(es) after ${maxRetries} retries.`
-    )
-    throw new Error(
-      `Failed to confirm ${pendingBatches.length} batch(es) after ${maxRetries} retries.`
-    )
-  }
+  })
 
   console.log("All batches confirmed successfully.")
 }

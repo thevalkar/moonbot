@@ -160,7 +160,7 @@ export const getBuyPumpfunTokenTransaction = async (
       )
 
       let latestBlockHash = await connection.getLatestBlockhashAndContext(
-        "processed"
+        "confirmed"
       )
       const versionedTransaction = new VersionedTransaction(
         new TransactionMessage({
@@ -316,22 +316,23 @@ export const getSellPumpfunTokenTransaction = async (
         )} Attempt ${tries} to sell ${tokenMint} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
       )
 
-
-
-      let latestBlockHash = await connection.getLatestBlockhashAndContext(
-        "processed"
-      )
+      let latestBlockHash = await connection.getLatestBlockhash("confirmed")
       const versionedTransaction = new VersionedTransaction(
         new TransactionMessage({
           payerKey: keypair.publicKey,
-          recentBlockhash: latestBlockHash.value.blockhash,
+          recentBlockhash: latestBlockHash.blockhash,
           instructions: ixs,
         }).compileToV0Message()
       )
 
       versionedTransaction.sign([keypair])
 
-      return versionedTransaction.serialize()
+      const simulated = await connection.simulateTransaction(versionedTransaction)
+      if (simulated.value.err) {
+        throw new Error(`Invalid tx for ${tokenMint.toString()} ` + JSON.stringify(simulated.value.err))
+      } else {
+        return versionedTransaction.serialize()
+      }
     } catch (e) {
       console.log(e)
       tries++
