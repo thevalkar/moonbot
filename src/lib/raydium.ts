@@ -80,7 +80,7 @@ export const getBuyRaydiumTokenTransaction = async (
       }
 
       let latestBlockHash = await connection.getLatestBlockhashAndContext(
-        "processed"
+        "confirmed"
       )
 
       const ixs = [...ixsRes.instructions]
@@ -391,6 +391,7 @@ export const getSwapInstructions = async (
 
       return { instructions, minAmountOut, currentPrice }
     } catch (e: any) {
+      console.error(e)
       error = e
       retries++
       await new Promise((resolve) => setTimeout(resolve, 100))

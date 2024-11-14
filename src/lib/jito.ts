@@ -17,7 +17,7 @@ const connection = new Connection(heliusRpcUrl)
 const payerKeypair = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))
 )
-export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountInSol = 0.0011) {
+export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountInSol = 0.0029) {
   const base58EncodedTransactions = transactions.map((tx) => bs58.encode(tx))
   const jitoClient = new JitoJsonRpcClient(
     "https://mainnet.block-engine.jito.wtf/api/v1",
@@ -42,8 +42,7 @@ export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountIn
     batches.push(batch)
   }
 
-  batches.map(async batch => {
-
+  for (const batch of batches) {
     const jitoTransaction = new Transaction()
     jitoTransaction.add(
       SystemProgram.transfer({
@@ -75,28 +74,32 @@ export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountIn
         [base58EncodedJitoTransaction].concat(batch),
       ])
 
-      const bundleId = res.result
-      console.log("Bundle ID:", bundleId)
-      const inflightStatus = await jitoClient.confirmInflightBundle(
-        bundleId,
-        15000
-      )
 
-      if (inflightStatus.status === "Landed") {
-        console.log(
-          `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
-        )
+      // Let's ignore confirming for now since we can't do anything about it.
+      // @TODO later when sniping we should check if balance changed, if not changed we have to re-snipe the coin.
+      // @TODO also some coins we can't snipe it because too much volume probably. Let's query the `coins` table and find `volume` and `created. If `volume` is high, and `created` is < 15 min, we can increase bribery.
 
-        return bundleId
-      } else {
-        console.log(inflightStatus)
+      // const bundleId = res.result
+      // console.log("Bundle ID:", bundleId)
+      // const inflightStatus = await jitoClient.confirmInflightBundle(
+      //   bundleId,
+      // )
 
-        throw new Error(
-          "Batch processing failed: " +
-          JSON.stringify(inflightStatus) +
-          ""
-        )
-      }
+      // if (inflightStatus.status === "Landed" || inflightStatus.confirmation_status === "confirmed" || inflightStatus.confirmation_status === "finalized") {
+      //   console.log(
+      //     `Batch successfully confirmed on-chain at slot ${inflightStatus.slot}`
+      //   )
+
+      //   return bundleId
+      // } else {
+      //   console.log(inflightStatus)
+
+      //   throw new Error(
+      //     "Batch processing failed: " +
+      //     JSON.stringify(inflightStatus) +
+      //     ""
+      //   )
+      // }
 
     } catch (e: any) {
       console.error("Error sending batch:", e)
@@ -105,7 +108,9 @@ export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountIn
       }
 
     }
-  })
+
+    await new Promise(resolve => setTimeout(resolve, 2100))
+  }
 
   console.log("All batches confirmed successfully.")
 }

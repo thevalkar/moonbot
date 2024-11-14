@@ -25,7 +25,7 @@ import chalk from "chalk"
 
 const connection = new Connection(heliusRpcUrl, {
   confirmTransactionInitialTimeout: 1 * 80 * 1000,
-  commitment: "processed",
+  commitment: "confirmed",
 })
 
 const program = new Program(
@@ -76,7 +76,7 @@ export const getBuyPumpfunTokenTransaction = async (
       const [bondingCurveData, mintData, account] = await Promise.all([
         program.account.bondingCurve.fetch(bondingCurve),
         connection.getParsedAccountInfo(tokenMint),
-        connection.getAccountInfo(signerTokenAccount, "processed"),
+        connection.getAccountInfo(signerTokenAccount, "confirmed"),
       ])
 
       //@ts-ignore
@@ -239,7 +239,7 @@ export const getSellPumpfunTokenTransaction = async (
       const [bondingCurveData, mintData, account] = await Promise.all([
         program.account.bondingCurve.fetch(bondingCurve),
         connection.getParsedAccountInfo(tokenMint),
-        connection.getAccountInfo(signerTokenAccount, "processed"),
+        connection.getAccountInfo(signerTokenAccount, "confirmed"),
       ])
 
       //@ts-ignore

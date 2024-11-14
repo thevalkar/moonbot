@@ -42,7 +42,7 @@ client.on("ready", () => {
   console.log(`Logged in as ${client.user?.tag}!`)
 })
 
-const connection = new Connection(heliusRpcUrl)
+const connection = new Connection(process.env.RPC_URL as string)
 // Handle messages
 // client.on(Events.MessageCreate, async (message: Message) => {
 //   console.log(message.content)
@@ -472,8 +472,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     topTokens
                       .map(
                         (token, index) =>
-                          `**${index + 1}.** \`${
-                            token.mint
+                          `**${index + 1}.** \`${token.mint
                           }\`-  **${token.value.toFixed(
                             2
                           )} SOL** (${Intl.NumberFormat("en-US", {
