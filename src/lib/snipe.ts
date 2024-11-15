@@ -1,7 +1,15 @@
-import { Connection, Keypair, PublicKey, SystemProgram, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js"
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js"
 import { getCoinsPairs } from "./postgres"
 import { getBuyRaydiumTokenTransaction } from "./raydium"
-import kp from "../../payer.json"
+// import kp from "../../payer.json"
 import { sendJitoBundle } from "./jito"
 import { getWalletTokenBalance, sendAndRetryTransaction } from "./utils"
 import { configDotenv } from "dotenv"
@@ -24,158 +32,199 @@ const heliusConnection = new Connection(
   "processed"
 )
 
-
-
-export const snipeAnyCoinGuaranteed = async (coin: string, keypairs: Keypair[]) => {
-  // We only want wallets that don't have the coin yet.
-  const snipers = (await Promise.all(keypairs.map(async keypair => {
-    // Check if bought
-    const walletCoinBalance = await getWalletTokenBalance(
-      quicknodeConnection,
-      keypair.publicKey,
-      new PublicKey(coin)
-    )
-
-    if (walletCoinBalance?.value.uiAmount) {
-      return false
-    }
-
-    return keypair
-  }))).filter((sniper) => sniper instanceof Keypair)
-
-  if (keypairs.length > 0 && snipers.length === 0) {
-    console.log(`${chalk.green('Success')} All snipers have already bought ${coin}`)
-    return true
-  }
-
-  console.log(`Sniping ${coin} with ${snipers.length} wallets`)
-  const pairByMint = await getCoinsPairs([coin])
-
-  const result = pairByMint[coin]
-
-  if (!result) {
-    throw new Error(`Couldn't find pair address for ${coin}`)
-  }
-
-  const { mint, pair, source } = result
-
-  const txByWallet: Record<string, Uint8Array> = {}
-  const txs = await Promise.all(snipers.map(async keypair => {
-    let tx
-
-    if (source === "Raydium") {
-      tx = await getBuyRaydiumTokenTransaction(
-        quicknodeConnection,
-        keypair,
-        mint,
-        pair,
-        0.001,
-        0.0005
-      )
-    } else {
-
-
-      tx = await getBuyPumpfunTokenTransaction(
-        quicknodeConnection,
-        keypair,
-        new PublicKey(coin),
-        new PublicKey(pair),
-        0.001,
-        0.0005
-      )
-    }
-
-    if (!tx || !(tx instanceof Uint8Array)) {
-      // Retry mounting tx again
-      snipeAnyCoinGuaranteed(coin, [keypair])
-      return false
-    }
-
-    txByWallet[keypair.publicKey.toString()] = tx
-
-    return tx
-  }))
-
-  const buyTxs = txs.filter((tx): tx is Uint8Array => !!tx && (tx instanceof Uint8Array))
-
-  console.log(`Sending ${Object.values(txByWallet).length} transactions...`)
+export const snipeAnyCoinGuaranteed = async (
+  coin: string,
+  keypairs: Keypair[]
+) => {
   try {
-    // Since we can't retry sending a Jito bundle, just send it.
-    sendJitoBundle(buyTxs)
-  } catch (e) {
-    console.log(e)
-  }
-
-  const bought: Record<string, boolean> = {}
-  await Promise.all(snipers.map(async keypair => {
-    if (!txByWallet[keypair.publicKey.toString()]) return null
-
-    const blockhashAndContext = await heliusConnection.getLatestBlockhashAndContext("processed")
-
-    let tries = 0
-    // Try forever until bought never give up
-    while (!bought[keypair.publicKey.toString()] && tries < 10) {
-      try {
-        // Check if bought
-        const walletCoinBalance = await getWalletTokenBalance(
-          quicknodeConnection,
-          keypair.publicKey,
-          new PublicKey(coin)
-        )
-
-        if (walletCoinBalance?.value.uiAmount) {
-          console.log(
-            `${chalk.green(
-              "Success"
-            )} Bought ${coin} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
+    // We only want wallets that don't have the coin yet.
+    const snipers = (
+      await Promise.all(
+        keypairs.map(async (keypair) => {
+          // Check if bought
+          const walletCoinBalance = await getWalletTokenBalance(
+            quicknodeConnection,
+            keypair.publicKey,
+            new PublicKey(coin)
           )
 
-          bought[keypair.publicKey.toString()] = true
-          break
-        }
+          if (walletCoinBalance?.value.uiAmount) {
+            return false
+          }
 
-        console.log(
-          `Attempt ${tries} to buy ${coin} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
-        )
+          const walletBalance = await quicknodeConnection.getBalance(
+            keypair.publicKey
+          )
 
-        // Send to Jito, Helius, Quicknode, Alchemy, Triton, Your mom, Anything we possibly can
-        await quicknodeConnection.sendRawTransaction(txByWallet[keypair.publicKey.toString()], {
-          preflightCommitment: "processed",
-          // minContextSlot: blockhashAndContext.context.slot,
-          maxRetries: 0,
+          if (walletBalance / 1e9 < 0.05) {
+            return false
+          }
+
+          return keypair
         })
-        await heliusConnection.sendRawTransaction(txByWallet[keypair.publicKey.toString()], {
-          preflightCommitment: "processed",
-          // minContextSlot: blockhashAndContext.context.slot,
-          maxRetries: 0,
-        })
-      } catch (e) {
-      } finally {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+      )
+    ).filter((sniper) => sniper instanceof Keypair)
 
-        const blockHeight = await heliusConnection.getBlockHeight("processed")
-        // Too much time passed. Start again
-        if (!bought && blockHeight > blockhashAndContext.value.lastValidBlockHeight) {
-          console.log(`${chalk.yellow(`Too much time passed. Start again to buy ${coin} for ${keypair.publicKey.toString()}`)}`)
-          snipeAnyCoinGuaranteed(coin, [keypair])
-          break
-        }
-
-        tries++
-      }
+    if (keypairs.length > 0 && snipers.length === 0) {
+      console.log(
+        `${chalk.green("Success")} All snipers have already bought ${coin}`
+      )
+      return true
     }
 
-    return true
-  }))
-}
+    console.log(`Sniping ${coin} with ${snipers.length} wallets`)
+    const pairByMint = await getCoinsPairs([coin])
 
+    const result = pairByMint[coin]
+
+    if (!result) {
+      throw new Error(`Couldn't find pair address for ${coin}`)
+    }
+
+    const { mint, pair, source } = result
+
+    const txByWallet: Record<string, Uint8Array> = {}
+    const txs = await Promise.all(
+      snipers.map(async (keypair) => {
+        let tx
+
+        if (source === "Raydium") {
+          tx = await getBuyRaydiumTokenTransaction(
+            quicknodeConnection,
+            keypair,
+            mint,
+            pair,
+            0.01,
+            0.00005
+          )
+        } else {
+          tx = await getBuyPumpfunTokenTransaction(
+            quicknodeConnection,
+            keypair,
+            new PublicKey(coin),
+            new PublicKey(pair),
+            0.01,
+            0.00005
+          )
+        }
+
+        if (!tx || !(tx instanceof Uint8Array)) {
+          // Retry mounting tx again
+          snipeAnyCoinGuaranteed(coin, [keypair])
+          return false
+        }
+
+        txByWallet[keypair.publicKey.toString()] = tx
+
+        return tx
+      })
+    )
+
+    const buyTxs = txs.filter(
+      (tx): tx is Uint8Array => !!tx && tx instanceof Uint8Array
+    )
+
+    console.log(`Sending ${Object.values(txByWallet).length} transactions...`)
+    try {
+      // Since we can't retry sending a Jito bundle, just send it.
+      sendJitoBundle(buyTxs)
+    } catch (e) {
+      console.log(e)
+    }
+
+    const bought: Record<string, boolean> = {}
+    await Promise.all(
+      snipers.map(async (keypair) => {
+        if (!txByWallet[keypair.publicKey.toString()]) return null
+
+        const blockhashAndContext =
+          await heliusConnection.getLatestBlockhashAndContext("processed")
+
+        let tries = 0,
+          isBlockheightValid
+        // Try forever until bought never give up
+        while (!bought[keypair.publicKey.toString()] && isBlockheightValid) {
+          try {
+            // Check if bought
+            const walletCoinBalance = await getWalletTokenBalance(
+              quicknodeConnection,
+              keypair.publicKey,
+              new PublicKey(coin)
+            )
+
+            if (walletCoinBalance?.value.uiAmount) {
+              console.log(
+                `${chalk.green(
+                  "Success"
+                )} Bought ${coin} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
+              )
+
+              bought[keypair.publicKey.toString()] = true
+              break
+            }
+
+            console.log(
+              `Attempt ${tries} to buy ${coin} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
+            )
+
+            // Send to Jito, Helius, Quicknode, Alchemy, Triton, Your mom, Anything we possibly can
+            await quicknodeConnection.sendRawTransaction(
+              txByWallet[keypair.publicKey.toString()],
+              {
+                preflightCommitment: "processed",
+                // minContextSlot: blockhashAndContext.context.slot,
+                // maxRetries: 0,
+              }
+            )
+            await heliusConnection.sendRawTransaction(
+              txByWallet[keypair.publicKey.toString()],
+              {
+                preflightCommitment: "processed",
+                // minContextSlot: blockhashAndContext.context.slot,
+                // maxRetries: 0,
+              }
+            )
+          } catch (e) {
+          } finally {
+            await new Promise((resolve) => setTimeout(resolve, 3500))
+
+            const blockHeight = await heliusConnection.getBlockHeight(
+              "processed"
+            )
+            isBlockheightValid =
+              blockHeight <= blockhashAndContext.value.lastValidBlockHeight
+
+            // Too much time passed. Start again
+            if (!bought[keypair.publicKey.toString()] && isBlockheightValid) {
+              console.log(
+                `${chalk.yellow(
+                  `Too much time passed. Start again to buy ${coin} for ${keypair.publicKey.toString()}`
+                )}`
+              )
+              break
+            }
+
+            tries++
+          }
+        }
+
+        if (!bought[keypair.publicKey.toString()]) {
+          snipeAnyCoinGuaranteed(coin, [keypair])
+        }
+
+        return true
+      })
+    )
+  } catch (e) {
+    console.error(e)
+  }
+}
 
 // Test mode only
 // ; (async () => {
 //   const keypairs = []
 //   for (let i = 1; i <= 20; i++) {
 //     const keypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync('./wallets/' + i + ".json", 'utf-8'))))
-
 
 //     keypairs.push(keypair)
 

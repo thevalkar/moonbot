@@ -47,7 +47,7 @@ export const PUMPFUN_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 export const RAYDIUM_PROGRAM_ID = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
 export const MOONSHOT_PROGRAM_ID = "MoonCVVNZFSYkqNXP6bxHLPL6QQJiMagDL3qcqUQTrG"
 
-export const heliusRpcUrl = process.env.RPC_URL as string
+export const heliusRpcUrl = process.env.HELIUS_RPC_URL as string
 
 const umi = createUmi(heliusRpcUrl).use(mplTokenMetadata())
 
@@ -942,7 +942,7 @@ export const sendAndRetryTransaction = async (
         // maxRetries: 0,
       })
       blockHeight = await connection.getBlockHeight("processed")
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise(resolve => setTimeout(resolve, 2500))
     } catch (e) { }
   }
 

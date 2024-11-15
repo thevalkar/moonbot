@@ -22,6 +22,8 @@ import {
 } from "@raydium-io/raydium-sdk"
 import { getWalletTokenBalance, sendAndRetryTransaction } from "./utils"
 import chalk from "chalk"
+import { configDotenv } from "dotenv"
+configDotenv()
 
 const jitoPayerKeypair = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))

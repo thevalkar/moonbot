@@ -37,6 +37,7 @@ import { createServer } from "https"
 import { configDotenv } from "dotenv"
 import { sendJitoBundle } from "./lib/jito"
 import { Server } from "socket.io"
+import { snipeAnyCoinGuaranteed } from "./lib/snipe"
 configDotenv()
 
 const isSignaling: {
@@ -152,7 +153,7 @@ const onTransactionBuyAndSignalToken = async (
       transactionSource === "Raydium" ? MIN_BUYERS_RAYDIUM : MIN_BUYERS_PUMPFUN
 
     if (uniqueBuyersCount >= BUYERS_AMOUNT_FOR_SIGNAL) {
-      const shouldBuy = false
+      let shouldBuy = tokenFdv < 5000
       // tokenFdv < 5000
 
       if (shouldBuy) {
@@ -165,33 +166,33 @@ const onTransactionBuyAndSignalToken = async (
           }[]
         >`select keypair, code, enabled from moonbot_invite_codes`
 
-        const promises = codes.map(async ({ keypair, code, enabled }) => {
+
+        const keypairs = (await Promise.all(codes.map(async ({ keypair, code, enabled }) => {
           if (!enabled) return null
+
 
           try {
             const decrypted = await decrypt(keypair)
             if (!decrypted) throw new Error("Decryption failed for " + code)
             const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
-            return await getSnipeTransaction(kp, data)
+
+            return kp
+            // return await getSnipeTransaction(kp, data)
           } catch (e) {
             console.log(`Error buying for ${code}: ` + e)
           }
           return null
-        })
+        }))).filter(kp => kp instanceof Keypair)
 
-        const txs = (await Promise.all(promises)).filter(
-          (tx): tx is Uint8Array => tx !== undefined && tx !== null && !!tx
-        )
-
-        if (txs.length > 0) {
           ; (async () => {
             try {
-              await sendJitoBundle(txs)
+              snipeAnyCoinGuaranteed(tokenMint, keypairs)
+
             } catch (e) {
-              console.error("Error sending Jito bundle:", e)
+              console.error(e)
             }
           })()
-        }
+
       } else {
         const solanaPrice = await getSolanaPrice()
         const marketCapInUsd = solanaPrice * tokenFdv
@@ -428,6 +429,13 @@ expressApp.post("/", async (req, res) => {
 
 const port = process.env.API_PORT || 443
 server.listen(port, () => console.log(`App is running on port ${port}`))
+process.on('SIGINT', () => {
+  console.log('Server closed on SIGINT');
+  server.close()
+
+  process.exit(0);
+});
+
 
 
 const connection = new Connection(heliusRpcUrl, {

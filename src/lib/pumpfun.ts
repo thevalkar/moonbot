@@ -292,12 +292,6 @@ export const getSellPumpfunTokenTransaction = async (
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee })
       )
 
-      console.log(
-        `${chalk.green(
-          "[SNIPING_BOT] Pump.fun sell"
-        )} [${keypair.publicKey.toString()}]: ${amount} ${tokenMint.toString()} for ${minSolOutput} SOL`
-      )
-
       const snipeIx = await program.methods
         .sell(
           new BN(amount * 10 ** decimals),
