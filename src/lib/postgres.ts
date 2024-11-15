@@ -3,11 +3,30 @@ import postgres from "postgres"
 import { DigitalAsset } from "@metaplex-foundation/mpl-token-metadata"
 import dotenv from "dotenv"
 
-dotenv.config({
-  path: '/root/workspace/moonbot/.env'
-})
+dotenv.config()
 
 export const sql = postgres(process.env.DATABASE_URL as string)
+
+export const getCoinsPairs = async (mints: string[]) => {
+  const results = await sql<
+    { pair: string, mint: string, source: string }[]>`
+    select pair, mint, source from coins where mint IN ${sql(mints)}
+  `
+
+  const pairByMint: Record<string, { pair: string, mint: string, source: string }> = {}
+  if (results.length) {
+    for (const result of results) {
+      const { pair, mint, source } = result
+      pairByMint[mint] = {
+        pair, source, mint
+      }
+    }
+
+  }
+
+  return pairByMint
+}
+
 
 export type PairSqlRow = {
   token_mint: string

@@ -41,9 +41,7 @@ import { token } from "@coral-xyz/anchor/dist/cjs/utils"
 import crypto from "crypto"
 import dotenv from "dotenv"
 import { SOL_MINT } from "./raydium"
-dotenv.config({
-  path: '/root/workspace/moonbot/.env'
-})
+dotenv.config()
 
 export const PUMPFUN_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 export const RAYDIUM_PROGRAM_ID = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
@@ -512,26 +510,6 @@ export const getTokenPrice = async (
   return tokenPriceInSol
 }
 
-export const insertTokensIntoDatabase = async (
-  tokensWithNoData: string[],
-  fetchAsset: boolean = true
-) => {
-  await Promise.all(
-    tokensWithNoData.map(async (token) => {
-      const info = await getTokenPairAddressAndAsset(token, fetchAsset)
-
-      if (!info) return
-
-      const { tokenMint, asset, pairAddress } = info
-
-      const inserted = await insertToken(tokenMint, asset, pairAddress)
-      console.log(`${chalk.green("Inserted token")}`, tokenMint)
-
-      return inserted
-    })
-  )
-}
-
 export const getTokenPairAddressAndAsset = async (
   tokenMint: string,
   fetchAsset = false
@@ -923,18 +901,17 @@ BigInt.prototype["toJSON"] = function () {
 
 export const sendAndRetryTransaction = async (
   connection: Connection,
-  transaction: VersionedTransaction,
-  blockhashAndContext: Awaited<
-    ReturnType<typeof Connection.prototype.getLatestBlockhashAndContext>
-  >
+  transaction: Uint8Array,
 ) => {
   let blockHeight
   let txid
   let confirmed = false
 
+  const blockhashAndContext = await connection.getLatestBlockhashAndContext("processed")
+
   try {
     blockHeight = await connection.getBlockHeight("processed")
-    txid = await connection.sendRawTransaction(transaction.serialize(), {
+    txid = await connection.sendRawTransaction(transaction, {
       skipPreflight: true,
       preflightCommitment: "processed",
       // minContextSlot: blockhashAndContext.context.slot,
@@ -958,13 +935,14 @@ export const sendAndRetryTransaction = async (
     !confirmed
   ) {
     try {
-      txid = await connection.sendRawTransaction(transaction.serialize(), {
+      txid = await connection.sendRawTransaction(transaction, {
         skipPreflight: true,
         preflightCommitment: "processed",
         // minContextSlot: blockhashAndContext.context.slot,
         // maxRetries: 0,
       })
       blockHeight = await connection.getBlockHeight("processed")
+      await new Promise(resolve => setTimeout(resolve, 1000))
     } catch (e) { }
   }
 

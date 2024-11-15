@@ -17,7 +17,7 @@ const connection = new Connection(heliusRpcUrl)
 const payerKeypair = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))
 )
-export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountInSol = 0.0029) {
+export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountInSol = 0.00029) {
   const base58EncodedTransactions = transactions.map((tx) => bs58.encode(tx))
   const jitoClient = new JitoJsonRpcClient(
     "https://mainnet.block-engine.jito.wtf/api/v1",
@@ -102,10 +102,10 @@ export async function sendJitoBundle(transactions: Uint8Array[], jitoTipAmountIn
       // }
 
     } catch (e: any) {
-      console.error("Error sending batch:", e)
-      if (e.response && e.response.data) {
-        console.error("Server response:", e.response.data)
-      }
+      // console.error("Error sending batch:", e)
+      // if (e.response && e.response.data) {
+      //   console.error("Server response:", e.response.data)
+      // }
 
     }
 

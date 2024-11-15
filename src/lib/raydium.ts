@@ -33,23 +33,13 @@ export const getBuyRaydiumTokenTransaction = async (
   tokenMint: string,
   poolId: string,
   amountInSol: number = 0.01,
+  feesInSol = 0.0001,
   poolKeys?: Awaited<ReturnType<typeof fetchPoolAndMarketAccounts>>["poolKeys"]
 ) => {
   let tries = 1
 
   while (tries < 5) {
     try {
-      const balance = await getWalletTokenBalance(
-        connection,
-        keypair.publicKey,
-        new PublicKey(tokenMint)
-      )
-
-      if (balance?.value.uiAmount) {
-        console.log(`Wallet ${keypair.publicKey.toString()} already has balance for ${tokenMint}`)
-        break
-      }
-
       if (!poolKeys) {
         try {
           poolKeys = (await fetchPoolAndMarketAccounts(connection, poolId))
@@ -64,19 +54,14 @@ export const getBuyRaydiumTokenTransaction = async (
         }
       }
 
-      console.log(
-        `${chalk.green(
-          "[SNIPING_BOT]"
-        )} Attempt ${tries} to buy ${tokenMint} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
-      )
-
       const ixsRes = await getSwapInstructions(
         connection,
         keypair,
         poolKeys,
         "buy",
         amountInSol,
-        51
+        51,
+        feesInSol
       )
 
       if (!ixsRes) {

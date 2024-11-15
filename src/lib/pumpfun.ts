@@ -20,7 +20,7 @@ import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token"
-import { MEMO_PROGRAM_ID } from "@raydium-io/raydium-sdk"
+import { ASSOCIATED_TOKEN_PROGRAM_ID, MEMO_PROGRAM_ID } from "@raydium-io/raydium-sdk"
 import chalk from "chalk"
 
 const connection = new Connection(heliusRpcUrl, {
@@ -40,8 +40,6 @@ const program = new Program(
 const feeRecipient = "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
 const EVENT_AUTH = "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1"
 
-const priorityFee = 0.000011 * LAMPORTS_PER_SOL
-
 const globalState = new PublicKey(
   "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf"
 )
@@ -50,17 +48,27 @@ const jitoPayerKeypair = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))
 )
 
+
 export const getBuyPumpfunTokenTransaction = async (
   connection: Connection,
   keypair: Keypair,
   tokenMint: PublicKey,
   bondingCurve: PublicKey,
-  bondingCurveAta: PublicKey,
-  globalState: PublicKey,
-  amountInSol = 0.003
+  amountInSol = 0.003,
+  feesInSol = 0.000011
 ) => {
   let bought = false
   let tries = 1
+  const priorityFee = feesInSol * LAMPORTS_PER_SOL
+
+  const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
+    [
+      bondingCurve.toBuffer(),
+      TOKEN_PROGRAM_ID.toBuffer(),
+      tokenMint.toBuffer(),
+    ],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  )
 
   while (!bought && tries < 5) {
     try {
@@ -119,7 +127,7 @@ export const getBuyPumpfunTokenTransaction = async (
           feeRecipient: feeRecipient,
           mint: tokenMint,
           bondingCurve: bondingCurve,
-          associatedBondingCurve: bondingCurveAta,
+          associatedBondingCurve,
           associatedUser: userAta,
           user: user,
           systemProgram: SystemProgram.programId,
@@ -221,9 +229,11 @@ export const getSellPumpfunTokenTransaction = async (
   bondingCurve: PublicKey,
   bondingCurveAta: PublicKey,
   globalState: PublicKey,
-  amount: number
+  amount: number,
+  feesInSol = 0.000011
 ) => {
   let tries = 1
+  const priorityFee = feesInSol * LAMPORTS_PER_SOL
 
   while (tries <= 5) {
     try {

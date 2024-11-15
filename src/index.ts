@@ -374,6 +374,7 @@ const getSnipeTransaction = async (
         tokenMint,
         tokenPairAddress,
         amountToBuyInSol,
+        0.0005,
         tokenRaydiumPoolKeys
       )
 
@@ -384,8 +385,6 @@ const getSnipeTransaction = async (
         keypair,
         new PublicKey(tokenMint),
         new PublicKey(tokenPairAddress),
-        new PublicKey(tokenPumpfunBondingCurveAta!),
-        new PublicKey(tokenPumpfunGlobalAddress!),
         amountToBuyInSol
       )
 
