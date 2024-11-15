@@ -23,6 +23,10 @@ import {
 import { getWalletTokenBalance, sendAndRetryTransaction } from "./utils"
 import chalk from "chalk"
 
+const jitoPayerKeypair = Keypair.fromSecretKey(
+  Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))
+)
+
 export const getBuyRaydiumTokenTransaction = async (
   connection: Connection,
   keypair: Keypair,
@@ -85,19 +89,17 @@ export const getBuyRaydiumTokenTransaction = async (
 
       const ixs = [...ixsRes.instructions]
 
-      // ix to transfer moonbot fees
-      // create account first if no balance
-      // const feesWallet = new PublicKey(
-      //   "9rAtMfHKvAobdwyoNYNZg4c63fUVVLJushVPMymv8iRc"
-      // )
 
-      // ixs.push(
-      //   SystemProgram.transfer({
-      //     fromPubkey: keypair.publicKey,
-      //     toPubkey: feesWallet,
-      //     lamports: 0.0005 * 1e9,
-      //   })
-      // )
+      const feesWallet = jitoPayerKeypair.publicKey
+
+      ixs.push(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: feesWallet,
+          lamports: 0.000725 * 1e9,
+        })
+      )
+
       const versionedTransaction = new VersionedTransaction(
         new TransactionMessage({
           payerKey: keypair.publicKey,

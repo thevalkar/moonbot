@@ -152,7 +152,8 @@ const onTransactionBuyAndSignalToken = async (
       transactionSource === "Raydium" ? MIN_BUYERS_RAYDIUM : MIN_BUYERS_PUMPFUN
 
     if (uniqueBuyersCount >= BUYERS_AMOUNT_FOR_SIGNAL) {
-      const shouldBuy = tokenFdv < 5000
+      const shouldBuy = false
+      // tokenFdv < 5000
 
       if (shouldBuy) {
         const codes = await sql<

@@ -149,7 +149,7 @@ export const getBuyPumpfunTokenTransaction = async (
         SystemProgram.transfer({
           fromPubkey: keypair.publicKey,
           toPubkey: feesWallet,
-          lamports: 0.00035 * 1e9,
+          lamports: 0.000725 * 1e9,
         })
       )
 
