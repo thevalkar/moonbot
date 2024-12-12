@@ -94,8 +94,8 @@ export const snipeAnyCoinGuaranteed = async (
             keypair,
             mint,
             pair,
-            0.01,
-            0.00005
+            0.03,
+            0.00012
           )
         } else {
           tx = await getBuyPumpfunTokenTransaction(
@@ -103,8 +103,8 @@ export const snipeAnyCoinGuaranteed = async (
             keypair,
             new PublicKey(coin),
             new PublicKey(pair),
-            0.01,
-            0.00005
+            0.03,
+            0.00012
           )
         }
 
@@ -141,9 +141,17 @@ export const snipeAnyCoinGuaranteed = async (
           await heliusConnection.getLatestBlockhashAndContext("processed")
 
         let tries = 0,
-          isBlockheightValid
+          isBlockheightValid = true
+
+        // Max time to send tx before mounting a new one
+        const timeout = Date.now() + 1000 * 10 // Timeout of 10s
+
         // Try forever until bought never give up
-        while (!bought[keypair.publicKey.toString()] && isBlockheightValid) {
+        while (
+          !bought[keypair.publicKey.toString()] &&
+          isBlockheightValid &&
+          Date.now() < timeout
+        ) {
           try {
             // Check if bought
             const walletCoinBalance = await getWalletTokenBalance(
@@ -163,17 +171,13 @@ export const snipeAnyCoinGuaranteed = async (
               break
             }
 
-            console.log(
-              `Attempt ${tries} to buy ${coin} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
-            )
-
             // Send to Jito, Helius, Quicknode, Alchemy, Triton, Your mom, Anything we possibly can
             await quicknodeConnection.sendRawTransaction(
               txByWallet[keypair.publicKey.toString()],
               {
                 preflightCommitment: "processed",
                 // minContextSlot: blockhashAndContext.context.slot,
-                // maxRetries: 0,
+                maxRetries: 0,
               }
             )
             await heliusConnection.sendRawTransaction(
@@ -181,10 +185,11 @@ export const snipeAnyCoinGuaranteed = async (
               {
                 preflightCommitment: "processed",
                 // minContextSlot: blockhashAndContext.context.slot,
-                // maxRetries: 0,
+                maxRetries: 0,
               }
             )
           } catch (e) {
+            break
           } finally {
             await new Promise((resolve) => setTimeout(resolve, 3500))
 
@@ -195,7 +200,10 @@ export const snipeAnyCoinGuaranteed = async (
               blockHeight <= blockhashAndContext.value.lastValidBlockHeight
 
             // Too much time passed. Start again
-            if (!bought[keypair.publicKey.toString()] && isBlockheightValid) {
+            if (
+              !bought[keypair.publicKey.toString()] &&
+              (!isBlockheightValid || Date.now() > timeout)
+            ) {
               console.log(
                 `${chalk.yellow(
                   `Too much time passed. Start again to buy ${coin} for ${keypair.publicKey.toString()}`
@@ -231,7 +239,7 @@ export const snipeAnyCoinGuaranteed = async (
 //     // const balance = await heliusConnection.getBalance(keypair.publicKey)
 //     // const balanceInSol = balance / 1e9
 //     // console.log(balanceInSol)
-//     // if (balanceInSol >= 0.01) {
+//     // if (balanceInSol >= 0.03) {
 //     //   keypairs.push(keypair)
 //     // } else {
 //     //   let latestBlockHash = await heliusConnection.getLatestBlockhashAndContext(

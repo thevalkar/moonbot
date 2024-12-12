@@ -79,13 +79,13 @@ export const getBuyRaydiumTokenTransaction = async (
 
       const feesWallet = jitoPayerKeypair.publicKey
 
-      ixs.push(
-        SystemProgram.transfer({
-          fromPubkey: keypair.publicKey,
-          toPubkey: feesWallet,
-          lamports: 0.000725 * 1e9,
-        })
-      )
+      // ixs.push(
+      //   SystemProgram.transfer({
+      //     fromPubkey: keypair.publicKey,
+      //     toPubkey: feesWallet,
+      //     lamports: 0.00035 * 1e9,
+      //   })
+      // )
 
       const versionedTransaction = new VersionedTransaction(
         new TransactionMessage({

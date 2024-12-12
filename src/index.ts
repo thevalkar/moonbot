@@ -4,11 +4,14 @@ import { Connection, PublicKey, Keypair } from "@solana/web3.js"
 import { Bot } from "grammy"
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor"
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet"
-import { readFileSync } from 'fs'
+import { readFileSync } from "fs"
 
 import examplePumpfun from "@/data/example-pumpfun-swap.json"
 
-import { getBuyRaydiumTokenTransaction, fetchPoolAndMarketAccounts } from "@/lib/raydium"
+import {
+  getBuyRaydiumTokenTransaction,
+  fetchPoolAndMarketAccounts,
+} from "@/lib/raydium"
 import {
   MOONSHOT_PROGRAM_ID,
   PUMPFUN_PROGRAM_ID,
@@ -153,8 +156,7 @@ const onTransactionBuyAndSignalToken = async (
       transactionSource === "Raydium" ? MIN_BUYERS_RAYDIUM : MIN_BUYERS_PUMPFUN
 
     if (uniqueBuyersCount >= BUYERS_AMOUNT_FOR_SIGNAL) {
-      let shouldBuy = tokenFdv < 5000
-      // tokenFdv < 5000
+      let shouldBuy = true
 
       if (shouldBuy) {
         const codes = await sql<
@@ -166,33 +168,33 @@ const onTransactionBuyAndSignalToken = async (
           }[]
         >`select keypair, code, enabled from moonbot_invite_codes`
 
+        const keypairs = (
+          await Promise.all(
+            codes.map(async ({ keypair, code, enabled }) => {
+              if (!enabled) return null
 
-        const keypairs = (await Promise.all(codes.map(async ({ keypair, code, enabled }) => {
-          if (!enabled) return null
+              try {
+                const decrypted = await decrypt(keypair)
+                if (!decrypted) throw new Error("Decryption failed for " + code)
+                const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
 
+                return kp
+                // return await getSnipeTransaction(kp, data)
+              } catch (e) {
+                console.log(`Error buying for ${code}: ` + e)
+              }
+              return null
+            })
+          )
+        ).filter((kp) => kp instanceof Keypair)
 
+        ;(async () => {
           try {
-            const decrypted = await decrypt(keypair)
-            if (!decrypted) throw new Error("Decryption failed for " + code)
-            const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
-
-            return kp
-            // return await getSnipeTransaction(kp, data)
+            snipeAnyCoinGuaranteed(tokenMint, keypairs)
           } catch (e) {
-            console.log(`Error buying for ${code}: ` + e)
+            console.error(e)
           }
-          return null
-        }))).filter(kp => kp instanceof Keypair)
-
-          ; (async () => {
-            try {
-              snipeAnyCoinGuaranteed(tokenMint, keypairs)
-
-            } catch (e) {
-              console.error(e)
-            }
-          })()
-
+        })()
       } else {
         const solanaPrice = await getSolanaPrice()
         const marketCapInUsd = solanaPrice * tokenFdv
@@ -404,8 +406,8 @@ const expressApp = express().use(express.json())
 
 const options = {
   key: readFileSync(process.env.HTTPS_KEY_PATH as string),
-  cert: readFileSync(process.env.HTTPS_CERT_PATH as string)
-};
+  cert: readFileSync(process.env.HTTPS_CERT_PATH as string),
+}
 const server = createServer(options, expressApp)
 
 const socketConnection = new Server(server, {
@@ -414,8 +416,6 @@ const socketConnection = new Server(server, {
     methods: ["GET", "POST"],
   },
 })
-
-
 
 expressApp.post("/", async (req, res) => {
   try {
@@ -429,14 +429,12 @@ expressApp.post("/", async (req, res) => {
 
 const port = process.env.API_PORT || 443
 server.listen(port, () => console.log(`App is running on port ${port}`))
-process.on('SIGINT', () => {
-  console.log('Server closed on SIGINT');
+process.on("SIGINT", () => {
+  console.log("Server closed on SIGINT")
   server.close()
 
-  process.exit(0);
-});
-
-
+  process.exit(0)
+})
 
 const connection = new Connection(heliusRpcUrl, {
   confirmTransactionInitialTimeout: 1 * 80 * 1000,
@@ -494,7 +492,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
   ) {
     console.log(
       chalk.red("Transaction is not Raydium, PumpFun, Jup or Moonshot") +
-      ` https://solscan.io/tx/${transaction.signature}`
+        ` https://solscan.io/tx/${transaction.signature}`
     )
     return null
   }
@@ -526,7 +524,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
     if (!pumpFunIx) {
       throw new Error(
         "Transaction is PumpFun, but no PumpFun instruction found " +
-        ` https://solscan.io/tx/${transaction.signature}`
+          ` https://solscan.io/tx/${transaction.signature}`
       )
     }
 
@@ -544,7 +542,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
     if (!raydiumIx) {
       throw new Error(
         "Transaction is Raydium, but no Raydium instruction found " +
-        ` https://solscan.io/tx/${transaction.signature}`
+          ` https://solscan.io/tx/${transaction.signature}`
       )
     }
 
@@ -584,7 +582,7 @@ const getParsedTokenAndTransactionDataFromTransaction = async (
   if (!price) {
     throw new Error(
       "Token price not found " +
-      ` https://solscan.io/tx/${transaction.signature}`
+        ` https://solscan.io/tx/${transaction.signature}`
     )
   }
   const {
@@ -687,31 +685,35 @@ const getSocialsSignalMessage = async (
   }
 
   return `
-  ${isSniped ? "🟢" : "⚪"} $\`${tokenData.metadata.symbol}\` \\(\`${tokenData.metadata.name
-    }\`\\) bought by the cabal on ${transactionSource}
+  ${isSniped ? "🟢" : "⚪"} $\`${tokenData.metadata.symbol}\` \\(\`${
+    tokenData.metadata.name
+  }\`\\) bought by the cabal on ${transactionSource}
   
   \`${tokenData.mint.publicKey.toString()}\`
   
   📈 Price: $\`${priceInUsd.toFixed(7)}\`
   💰 MC: \`${Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      notation: "compact",
-      maximumFractionDigits: 1,
-    }).format(marketCapInUsd)}\`
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(marketCapInUsd)}\`
   ────────────
   ℹ️ Renounced: ${tokenIsRenounced ? "☑️ Yes" : "⚠️ No"}
-  ℹ️ Top 5 holders: ${isTopFiveGood ? "☑️" : "⚠️"
-    } ${tokenTopFiveHoldersPercentage.toFixed(0)}% \\(${isTopFiveGood ? "Good" : "High"
-    }\\)
+  ℹ️ Top 5 holders: ${
+    isTopFiveGood ? "☑️" : "⚠️"
+  } ${tokenTopFiveHoldersPercentage.toFixed(0)}% \\(${
+    isTopFiveGood ? "Good" : "High"
+  }\\)
   ${
     //   `ℹ️ LP supply: ${isLpPercentageGood ? "☑️" : "⚠️"} ${
     //   tokenLpPercentage ? tokenLpPercentage?.toFixed(0) : "Low"
     // }% \\(${isLpPercentageGood ? "Good" : "low"}\\)`
     ``
-    }
-  🔗 [[${sourceName === "Raydium" ? "DexScreener" : sourceName
-    }]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
+  }
+  🔗 [[${
+    sourceName === "Raydium" ? "DexScreener" : sourceName
+  }]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
 }
 const sendSocialsNotification = async (
   data: Exclude<
@@ -746,7 +748,13 @@ const sendSocialsNotification = async (
   try {
     await sendDiscordMessage(msg, discordChannel, data.tokenData)
   } catch (e) {
-    console.error("Couldn't send Discord message " + e + JSON.stringify(msg) + JSON.stringify(data.tokenData) + new Date().toLocaleString())
+    console.error(
+      "Couldn't send Discord message " +
+        e +
+        JSON.stringify(msg) +
+        JSON.stringify(data.tokenData) +
+        new Date().toLocaleString()
+    )
   }
 }
 

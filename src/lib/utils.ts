@@ -901,18 +901,20 @@ BigInt.prototype["toJSON"] = function () {
 
 export const sendAndRetryTransaction = async (
   connection: Connection,
-  transaction: Uint8Array,
+  transaction: Uint8Array
 ) => {
   let blockHeight
   let txid
   let confirmed = false
 
-  const blockhashAndContext = await connection.getLatestBlockhashAndContext("processed")
+  const blockhashAndContext = await connection.getLatestBlockhashAndContext(
+    "processed"
+  )
 
   try {
     blockHeight = await connection.getBlockHeight("processed")
     txid = await connection.sendRawTransaction(transaction, {
-      skipPreflight: true,
+      // skipPreflight: true,
       preflightCommitment: "processed",
       // minContextSlot: blockhashAndContext.context.slot,
       // maxRetries: 0,
@@ -923,28 +925,28 @@ export const sendAndRetryTransaction = async (
       .then(() => {
         confirmed = true
       })
-      .catch((e) => { })
+      .catch((e) => {})
   } catch (e) {
     console.error(e)
 
     return {}
   }
 
-  while (
-    blockHeight < blockhashAndContext.value.lastValidBlockHeight &&
-    !confirmed
-  ) {
-    try {
-      txid = await connection.sendRawTransaction(transaction, {
-        skipPreflight: true,
-        preflightCommitment: "processed",
-        // minContextSlot: blockhashAndContext.context.slot,
-        // maxRetries: 0,
-      })
-      blockHeight = await connection.getBlockHeight("processed")
-      await new Promise(resolve => setTimeout(resolve, 2500))
-    } catch (e) { }
-  }
+  // while (
+  //   blockHeight < blockhashAndContext.value.lastValidBlockHeight &&
+  //   !confirmed
+  // ) {
+  //   try {
+  //     txid = await connection.sendRawTransaction(transaction, {
+  //       skipPreflight: true,
+  //       preflightCommitment: "processed",
+  //       // minContextSlot: blockhashAndContext.context.slot,
+  //       // maxRetries: 0,
+  //     })
+  //     blockHeight = await connection.getBlockHeight("processed")
+  //     await new Promise(resolve => setTimeout(resolve, 2500))
+  //   } catch (e) { }
+  // }
 
   return { txid }
 }
