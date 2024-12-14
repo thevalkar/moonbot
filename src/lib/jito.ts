@@ -19,7 +19,7 @@ const payerKeypair = Keypair.fromSecretKey(
 )
 export async function sendJitoBundle(
   transactions: Uint8Array[],
-  jitoTipAmountInSol = 0.00012
+  jitoTipAmountInSol = 0.000269858
 ) {
   try {
     const base58EncodedTransactions = transactions.map((tx) => bs58.encode(tx))

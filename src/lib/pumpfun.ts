@@ -20,7 +20,10 @@ import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token"
-import { ASSOCIATED_TOKEN_PROGRAM_ID, MEMO_PROGRAM_ID } from "@raydium-io/raydium-sdk"
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  MEMO_PROGRAM_ID,
+} from "@raydium-io/raydium-sdk"
 import chalk from "chalk"
 
 const connection = new Connection(heliusRpcUrl, {
@@ -48,7 +51,6 @@ const jitoPayerKeypair = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(process.env.JITO_PAYER_KEYPAIR as string))
 )
 
-
 export const getBuyPumpfunTokenTransaction = async (
   connection: Connection,
   keypair: Keypair,
@@ -59,7 +61,7 @@ export const getBuyPumpfunTokenTransaction = async (
 ) => {
   let bought = false
   let tries = 1
-  const priorityFee = feesInSol * LAMPORTS_PER_SOL
+  const priorityFee = Number((feesInSol * LAMPORTS_PER_SOL).toFixed(0))
 
   const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
     [
@@ -81,11 +83,35 @@ export const getBuyPumpfunTokenTransaction = async (
         TOKEN_PROGRAM_ID
       )
 
-      const [bondingCurveData, mintData, account] = await Promise.all([
-        program.account.bondingCurve.fetch(bondingCurve),
-        connection.getParsedAccountInfo(tokenMint),
-        connection.getAccountInfo(signerTokenAccount, "confirmed"),
-      ])
+      let bondingCurveData,
+        mintData,
+        account,
+        fetchTries = 1
+      while ((!bondingCurveData || !mintData) && fetchTries < 5) {
+        try {
+          ;[bondingCurveData, mintData, account] = await Promise.all([
+            program.account.bondingCurve.fetch(bondingCurve),
+            connection.getParsedAccountInfo(tokenMint),
+            connection.getAccountInfo(signerTokenAccount, "confirmed"),
+          ])
+        } catch (e) {
+          console.log(
+            `${chalk.redBright(
+              "[SNIPING_BOT]"
+            )} Failed to get bonding curve data for ${tokenMint.toString()} for ${keypair.publicKey.toString()} | ${fetchTries} tries | ${new Date().toUTCString()}`
+          )
+          console.log(bondingCurveData)
+        } finally {
+          await new Promise((resolve) => setTimeout(resolve, 2500))
+          fetchTries++
+        }
+      }
+
+      if (!bondingCurveData || !mintData) {
+        throw new Error(
+          `Failed to get bonding curve data for ${tokenMint.toString()} for ${keypair.publicKey.toString()} | ${fetchTries} tries | ${new Date().toUTCString()}`
+        )
+      }
 
       //@ts-ignore
       const decimals = mintData.value?.data.parsed.info.decimals
@@ -114,6 +140,12 @@ export const getBuyPumpfunTokenTransaction = async (
             user,
             tokenMint
           )
+        )
+      }
+
+      if (!finalAmount || isNaN(finalAmount)) {
+        throw new Error(
+          `Failed to get final amount for ${tokenMint.toString()} for ${keypair.publicKey.toString()} | ${new Date().toUTCString()}`
         )
       }
 
@@ -331,9 +363,14 @@ export const getSellPumpfunTokenTransaction = async (
 
       versionedTransaction.sign([keypair])
 
-      const simulated = await connection.simulateTransaction(versionedTransaction)
+      const simulated = await connection.simulateTransaction(
+        versionedTransaction
+      )
       if (simulated.value.err) {
-        throw new Error(`Invalid tx for ${tokenMint.toString()} ` + JSON.stringify(simulated.value.err))
+        throw new Error(
+          `Invalid tx for ${tokenMint.toString()} ` +
+            JSON.stringify(simulated.value.err)
+        )
       } else {
         return versionedTransaction.serialize()
       }

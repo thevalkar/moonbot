@@ -34,7 +34,8 @@ const heliusConnection = new Connection(
 
 export const snipeAnyCoinGuaranteed = async (
   coin: string,
-  keypairs: Keypair[]
+  keypairs: Keypair[],
+  attempt: number = 0
 ) => {
   try {
     // We only want wallets that don't have the coin yet.
@@ -86,37 +87,42 @@ export const snipeAnyCoinGuaranteed = async (
     const txByWallet: Record<string, Uint8Array> = {}
     const txs = await Promise.all(
       snipers.map(async (keypair) => {
-        let tx
+        try {
+          let tx
 
-        if (source === "Raydium") {
-          tx = await getBuyRaydiumTokenTransaction(
-            quicknodeConnection,
-            keypair,
-            mint,
-            pair,
-            0.03,
-            0.00012
-          )
-        } else {
-          tx = await getBuyPumpfunTokenTransaction(
-            quicknodeConnection,
-            keypair,
-            new PublicKey(coin),
-            new PublicKey(pair),
-            0.03,
-            0.00012
-          )
-        }
+          if (source === "Raydium") {
+            tx = await getBuyRaydiumTokenTransaction(
+              quicknodeConnection,
+              keypair,
+              mint,
+              pair,
+              0.03,
+              0.000269858
+            )
+          } else {
+            tx = await getBuyPumpfunTokenTransaction(
+              quicknodeConnection,
+              keypair,
+              new PublicKey(coin),
+              new PublicKey(pair),
+              0.03,
+              0.000269858
+            )
+          }
 
-        if (!tx || !(tx instanceof Uint8Array)) {
-          // Retry mounting tx again
-          snipeAnyCoinGuaranteed(coin, [keypair])
+          if (!tx || !(tx instanceof Uint8Array)) {
+            // Retry mounting tx again
+            snipeAnyCoinGuaranteed(coin, [keypair], attempt + 1)
+            return false
+          }
+
+          txByWallet[keypair.publicKey.toString()] = tx
+
+          return tx
+        } catch (e) {
+          console.log(e)
           return false
         }
-
-        txByWallet[keypair.publicKey.toString()] = tx
-
-        return tx
       })
     )
 
@@ -124,7 +130,13 @@ export const snipeAnyCoinGuaranteed = async (
       (tx): tx is Uint8Array => !!tx && tx instanceof Uint8Array
     )
 
+    if (!Object.values(txByWallet).length) {
+      console.log("No transactions to send")
+      return true
+    }
+
     console.log(`Sending ${Object.values(txByWallet).length} transactions...`)
+
     try {
       // Since we can't retry sending a Jito bundle, just send it.
       sendJitoBundle(buyTxs)
@@ -178,6 +190,7 @@ export const snipeAnyCoinGuaranteed = async (
                 preflightCommitment: "processed",
                 // minContextSlot: blockhashAndContext.context.slot,
                 maxRetries: 0,
+                // skipPreflight: true,
               }
             )
             await heliusConnection.sendRawTransaction(
@@ -186,12 +199,13 @@ export const snipeAnyCoinGuaranteed = async (
                 preflightCommitment: "processed",
                 // minContextSlot: blockhashAndContext.context.slot,
                 maxRetries: 0,
+                // skipPreflight: true,
               }
             )
           } catch (e) {
-            break
+            console.log(e)
           } finally {
-            await new Promise((resolve) => setTimeout(resolve, 3500))
+            await new Promise((resolve) => setTimeout(resolve, 1200))
 
             const blockHeight = await heliusConnection.getBlockHeight(
               "processed"
@@ -217,7 +231,15 @@ export const snipeAnyCoinGuaranteed = async (
         }
 
         if (!bought[keypair.publicKey.toString()]) {
-          snipeAnyCoinGuaranteed(coin, [keypair])
+          if (attempt < 5) {
+            snipeAnyCoinGuaranteed(coin, [keypair], attempt + 1)
+          } else {
+            console.log(
+              `${chalk.red(
+                `Failed to buy ${coin} for ${keypair.publicKey.toString()} after 5 attempts`
+              )}`
+            )
+          }
         }
 
         return true
@@ -239,7 +261,7 @@ export const snipeAnyCoinGuaranteed = async (
 //     // const balance = await heliusConnection.getBalance(keypair.publicKey)
 //     // const balanceInSol = balance / 1e9
 //     // console.log(balanceInSol)
-//     // if (balanceInSol >= 0.03) {
+//     // if (balanceInSol >= 0.01) {
 //     //   keypairs.push(keypair)
 //     // } else {
 //     //   let latestBlockHash = await heliusConnection.getLatestBlockhashAndContext(
