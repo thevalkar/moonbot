@@ -182,16 +182,17 @@ export const getBuyPumpfunTokenTransaction = async (
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee })
       )
 
-      const feesWallet = jitoPayerKeypair.publicKey
+      // const feesWallet = jitoPayerKeypair.publicKey
 
-      // ix to transfer jito fees
-      // ixs.push(
-      //   SystemProgram.transfer({
-      //     fromPubkey: keypair.publicKey,
-      //     toPubkey: feesWallet,
-      //     lamports: 0.00035 * 1e9,
-      //   })
-      // )
+      ixs.push(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: new PublicKey(
+            "nextBLoCkPMgmG8ZgJtABeScP35qLa2AMCNKntAP7Xc"
+          ),
+          lamports: 0.001 * 1e9,
+        })
+      )
 
       console.log(
         `${chalk.green(

@@ -76,16 +76,18 @@ export const getBuyRaydiumTokenTransaction = async (
 
       const ixs = [...ixsRes.instructions]
 
+      // const feesWallet = jitoPayerKeypair.publicKey
 
-      const feesWallet = jitoPayerKeypair.publicKey
-
-      // ixs.push(
-      //   SystemProgram.transfer({
-      //     fromPubkey: keypair.publicKey,
-      //     toPubkey: feesWallet,
-      //     lamports: 0.00035 * 1e9,
-      //   })
-      // )
+      // Transfer tip to Nextblock
+      ixs.push(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: new PublicKey(
+            "nextBLoCkPMgmG8ZgJtABeScP35qLa2AMCNKntAP7Xc"
+          ),
+          lamports: 0.001 * 1e9,
+        })
+      )
 
       const versionedTransaction = new VersionedTransaction(
         new TransactionMessage({
@@ -110,7 +112,7 @@ export const fetchPoolAndMarketAccounts = async (
   poolId: string
 ) => {
   let pool: ReturnType<typeof LIQUIDITY_STATE_LAYOUT_V4.decode> | undefined =
-    undefined,
+      undefined,
     market: MarketData | undefined = undefined
   let error: boolean | string = true
   let retries = 0

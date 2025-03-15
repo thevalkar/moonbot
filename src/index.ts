@@ -156,60 +156,66 @@ const onTransactionBuyAndSignalToken = async (
       transactionSource === "Raydium" ? MIN_BUYERS_RAYDIUM : MIN_BUYERS_PUMPFUN
 
     if (uniqueBuyersCount >= BUYERS_AMOUNT_FOR_SIGNAL) {
-      let shouldBuy = true
+      let shouldBuy = false
 
-      if (shouldBuy) {
-        const codes = await sql<
-          {
-            // bs58 encoded keypair
-            keypair: string
-            code: string
-            enabled: boolean
-          }[]
-        >`select keypair, code, enabled from moonbot_invite_codes`
+      // if (shouldBuy) {
+      const codes = await sql<
+        {
+          // bs58 encoded keypair
+          keypair: string
+          code: string
+          enabled: boolean
+        }[]
+      >`select keypair, code, enabled from moonbot_invite_codes`
 
-        const keypairs = (
-          await Promise.all(
-            codes.map(async ({ keypair, code, enabled }) => {
-              if (!enabled) return null
+      const keypairs = (
+        await Promise.all(
+          codes.map(async ({ keypair, code, enabled }) => {
+            if (!enabled) return null
 
-              try {
-                const decrypted = await decrypt(keypair)
-                if (!decrypted) throw new Error("Decryption failed for " + code)
-                const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
+            try {
+              const decrypted = await decrypt(keypair)
+              if (!decrypted) throw new Error("Decryption failed for " + code)
+              const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
 
-                return kp
-                // return await getSnipeTransaction(kp, data)
-              } catch (e) {
-                console.log(`Error buying for ${code}: ` + e)
-              }
-              return null
-            })
-          )
-        ).filter((kp) => kp instanceof Keypair)
+              if (
+                kp.publicKey.toString() !==
+                (process.env.SNIPING_WALLET_PUBLIC_KEY as string)
+              )
+                return null
 
-        ;(async () => {
-          try {
-            snipeAnyCoinGuaranteed(tokenMint, keypairs)
-          } catch (e) {
-            console.error(e)
-          }
-        })()
-      } else {
-        const solanaPrice = await getSolanaPrice()
-        const marketCapInUsd = solanaPrice * tokenFdv
-
-        console.log(
-          chalk.yellow(
-            `Token FDV is too high (${Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-              notation: "compact",
-              maximumFractionDigits: 1,
-            }).format(marketCapInUsd)}). Not buying.`
-          )
+              return kp
+              // return await getSnipeTransaction(kp, data)
+            } catch (e) {
+              console.log(`Error buying for ${code}: ` + e)
+            }
+            return null
+          })
         )
-      }
+      ).filter((kp) => kp instanceof Keypair)
+
+      ;(async () => {
+        try {
+          snipeAnyCoinGuaranteed(tokenMint, keypairs)
+        } catch (e) {
+          console.error(e)
+        }
+      })()
+      // } else {
+      //   const solanaPrice = await getSolanaPrice()
+      //   const marketCapInUsd = solanaPrice * tokenFdv
+
+      //   console.log(
+      //     chalk.yellow(
+      //       `Token FDV is too high (${Intl.NumberFormat("en-US", {
+      //         style: "currency",
+      //         currency: "USD",
+      //         notation: "compact",
+      //         maximumFractionDigits: 1,
+      //       }).format(marketCapInUsd)}). Not buying.`
+      //     )
+      //   )
+      // }
 
       const token = await insertToken(
         tokenMint,
@@ -274,6 +280,7 @@ const onTransactionBuyAndSignalToken = async (
             channelIdDiscord = DISCORD_WHALE_CHANNEL_ID
             threadIdTelegram = TELEGRAM_WHALE_THREAD_ID
           }
+
           await sendSocialsNotification(
             data,
             shouldBuy,
@@ -713,7 +720,7 @@ const getSocialsSignalMessage = async (
   }
   🔗 [[${
     sourceName === "Raydium" ? "DexScreener" : sourceName
-  }]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
+  }]](${sourceLink}) \\|  [[BonkBot]](https://t.me/bonkbot_bot?start=ref_1ncf2_ca_${tokenData.mint.publicKey.toString()}) \\|  [[Trojan]](https://t.me/paris_trojanbot?start=r-edceds-${tokenData.mint.publicKey.toString()}) \\|  [[Photon]](https://photon-sol.tinyastro.io/en/lp/${tokenData.mint.publicKey.toString()}?handle=19437044e66753b1e4627) \\|  [[Pepeboost]](https://t.me/pepeboost_sol_bot?start=ref_0261rz_ca_${tokenData.mint.publicKey.toString()}) \\|  [[BullX]](https://bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()}) [[NeoBullX]](https://neo.bullx.io/terminal?chainId=1399811149&address=${tokenData.mint.publicKey.toString()})`
 }
 const sendSocialsNotification = async (
   data: Exclude<

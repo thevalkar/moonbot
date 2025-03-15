@@ -22,15 +22,13 @@ configDotenv()
 
 // const mainKeypair = Keypair.fromSecretKey(Uint8Array.from(kp))
 
-const quicknodeConnection = new Connection(
-  process.env.RPC_URL as string,
-  "processed"
-)
-
 const heliusConnection = new Connection(
   process.env.HELIUS_RPC_URL as string,
   "processed"
 )
+
+const AMOUNT_TO_BUY_IN_SOL = 0.01
+const TX_FEES_IN_SOL = 0.000269858
 
 export const snipeAnyCoinGuaranteed = async (
   coin: string,
@@ -44,7 +42,7 @@ export const snipeAnyCoinGuaranteed = async (
         keypairs.map(async (keypair) => {
           // Check if bought
           const walletCoinBalance = await getWalletTokenBalance(
-            quicknodeConnection,
+            heliusConnection,
             keypair.publicKey,
             new PublicKey(coin)
           )
@@ -53,7 +51,7 @@ export const snipeAnyCoinGuaranteed = async (
             return false
           }
 
-          const walletBalance = await quicknodeConnection.getBalance(
+          const walletBalance = await heliusConnection.getBalance(
             keypair.publicKey
           )
 
@@ -92,21 +90,21 @@ export const snipeAnyCoinGuaranteed = async (
 
           if (source === "Raydium") {
             tx = await getBuyRaydiumTokenTransaction(
-              quicknodeConnection,
+              heliusConnection,
               keypair,
               mint,
               pair,
-              0.03,
-              0.000269858
+              AMOUNT_TO_BUY_IN_SOL,
+              TX_FEES_IN_SOL
             )
           } else {
             tx = await getBuyPumpfunTokenTransaction(
-              quicknodeConnection,
+              heliusConnection,
               keypair,
               new PublicKey(coin),
               new PublicKey(pair),
-              0.03,
-              0.000269858
+              AMOUNT_TO_BUY_IN_SOL,
+              TX_FEES_IN_SOL
             )
           }
 
@@ -126,10 +124,6 @@ export const snipeAnyCoinGuaranteed = async (
       })
     )
 
-    const buyTxs = txs.filter(
-      (tx): tx is Uint8Array => !!tx && tx instanceof Uint8Array
-    )
-
     if (!Object.values(txByWallet).length) {
       console.log("No transactions to send")
       return true
@@ -137,20 +131,23 @@ export const snipeAnyCoinGuaranteed = async (
 
     console.log(`Sending ${Object.values(txByWallet).length} transactions...`)
 
-    try {
-      // Since we can't retry sending a Jito bundle, just send it.
-      sendJitoBundle(buyTxs)
-    } catch (e) {
-      console.log(e)
-    }
+    // const buyTxs = txs.filter(
+    //   (tx): tx is Uint8Array => !!tx && tx instanceof Uint8Array
+    // )
+    // try {
+    //   // Since we can't retry sending a Jito bundle, just send it.
+    //   sendJitoBundle(buyTxs)
+    // } catch (e) {
+    //   console.log(e)
+    // }
+
+    const blockhashAndContext =
+      await heliusConnection.getLatestBlockhashAndContext("processed")
 
     const bought: Record<string, boolean> = {}
     await Promise.all(
       snipers.map(async (keypair) => {
         if (!txByWallet[keypair.publicKey.toString()]) return null
-
-        const blockhashAndContext =
-          await heliusConnection.getLatestBlockhashAndContext("processed")
 
         let tries = 0,
           isBlockheightValid = true
@@ -167,7 +164,7 @@ export const snipeAnyCoinGuaranteed = async (
           try {
             // Check if bought
             const walletCoinBalance = await getWalletTokenBalance(
-              quicknodeConnection,
+              heliusConnection,
               keypair.publicKey,
               new PublicKey(coin)
             )
@@ -183,25 +180,36 @@ export const snipeAnyCoinGuaranteed = async (
               break
             }
 
-            // Send to Jito, Helius, Quicknode, Alchemy, Triton, Your mom, Anything we possibly can
-            await quicknodeConnection.sendRawTransaction(
-              txByWallet[keypair.publicKey.toString()],
-              {
-                preflightCommitment: "processed",
-                // minContextSlot: blockhashAndContext.context.slot,
-                maxRetries: 0,
-                // skipPreflight: true,
-              }
-            )
-            await heliusConnection.sendRawTransaction(
-              txByWallet[keypair.publicKey.toString()],
-              {
-                preflightCommitment: "processed",
-                // minContextSlot: blockhashAndContext.context.slot,
-                maxRetries: 0,
-                // skipPreflight: true,
-              }
-            )
+            console.log(Date.now())
+            // Send to Nextblock first
+            const res = await fetch("https://ny.nextblock.io/api/v2/submit", {
+              method: "POST",
+              body: JSON.stringify({
+                transaction: {
+                  content: Buffer.from(
+                    txByWallet[keypair.publicKey.toString()]
+                  ).toString("base64"),
+                },
+                frontRunningProtection: true,
+              }),
+
+              headers: {
+                Authorization: process.env.NEXTBLOCK_API_KEY as string,
+              },
+            })
+
+            console.log(await res.json())
+
+            // Start sending to regular RPC
+            // await heliusConnection.sendRawTransaction(
+            //   txByWallet[keypair.publicKey.toString()],
+            //   {
+            //     preflightCommitment: "processed",
+            //     // minContextSlot: blockhashAndContext.context.slot,
+            //     maxRetries: 0,
+            //     // skipPreflight: true,
+            //   }
+            // )
           } catch (e) {
             console.log(e)
           } finally {
@@ -213,18 +221,18 @@ export const snipeAnyCoinGuaranteed = async (
             isBlockheightValid =
               blockHeight <= blockhashAndContext.value.lastValidBlockHeight
 
-            // Too much time passed. Start again
-            if (
-              !bought[keypair.publicKey.toString()] &&
-              (!isBlockheightValid || Date.now() > timeout)
-            ) {
-              console.log(
-                `${chalk.yellow(
-                  `Too much time passed. Start again to buy ${coin} for ${keypair.publicKey.toString()}`
-                )}`
-              )
-              break
-            }
+            // // Too much time passed. Start again
+            // if (
+            //   !bought[keypair.publicKey.toString()] &&
+            //   (!isBlockheightValid || Date.now() > timeout)
+            // ) {
+            //   console.log(
+            //     `${chalk.yellow(
+            //       `Too much time passed. Start again to buy ${coin} for ${keypair.publicKey.toString()}`
+            //     )}`
+            //   )
+            //   break
+            // }
 
             tries++
           }
@@ -289,4 +297,9 @@ export const snipeAnyCoinGuaranteed = async (
 
 //   snipeAnyCoinGuaranteed(coin, keypairs)
 
+// })()
+// ;(async () => {
+//   await snipeAnyCoinGuaranteed("ECWeqP3MnmVgKk7UHn3t6LREbiCM6vQu35gP4cU1pump", [
+//     mainKeypair,
+//   ])
 // })()
