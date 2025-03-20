@@ -36,7 +36,7 @@ import idl from "@/data/pumpfun-idl.json"
 import { getBuyPumpfunTokenTransaction } from "@/lib/pumpfun"
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes"
 import { decrypt } from "@/lib/utils"
-import { createServer } from "https"
+import { createServer } from "http"
 import { configDotenv } from "dotenv"
 import { sendJitoBundle } from "./lib/jito"
 import { Server } from "socket.io"
@@ -159,48 +159,48 @@ const onTransactionBuyAndSignalToken = async (
       let shouldBuy = false
 
       // if (shouldBuy) {
-      const codes = await sql<
-        {
-          // bs58 encoded keypair
-          keypair: string
-          code: string
-          enabled: boolean
-        }[]
-      >`select keypair, code, enabled from moonbot_invite_codes`
+      // const codes = await sql<
+      //   {
+      //     // bs58 encoded keypair
+      //     keypair: string
+      //     code: string
+      //     enabled: boolean
+      //   }[]
+      // >`select keypair, code, enabled from moonbot_invite_codes`
 
-      const keypairs = (
-        await Promise.all(
-          codes.map(async ({ keypair, code, enabled }) => {
-            if (!enabled) return null
+      // const keypairs = (
+      //   await Promise.all(
+      //     codes.map(async ({ keypair, code, enabled }) => {
+      //       if (!enabled) return null
 
-            try {
-              const decrypted = await decrypt(keypair)
-              if (!decrypted) throw new Error("Decryption failed for " + code)
-              const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
+      //       try {
+      //         const decrypted = await decrypt(keypair)
+      //         if (!decrypted) throw new Error("Decryption failed for " + code)
+      //         const kp = Keypair.fromSecretKey(bs58.decode(decrypted))
 
-              if (
-                kp.publicKey.toString() !==
-                (process.env.SNIPING_WALLET_PUBLIC_KEY as string)
-              )
-                return null
+      //         if (
+      //           kp.publicKey.toString() !==
+      //           (process.env.SNIPING_WALLET_PUBLIC_KEY as string)
+      //         )
+      //           return null
 
-              return kp
-              // return await getSnipeTransaction(kp, data)
-            } catch (e) {
-              console.log(`Error buying for ${code}: ` + e)
-            }
-            return null
-          })
-        )
-      ).filter((kp) => kp instanceof Keypair)
+      //         return kp
+      //         // return await getSnipeTransaction(kp, data)
+      //       } catch (e) {
+      //         console.log(`Error buying for ${code}: ` + e)
+      //       }
+      //       return null
+      //     })
+      //   )
+      // ).filter((kp) => kp instanceof Keypair)
 
-      ;(async () => {
-        try {
-          snipeAnyCoinGuaranteed(tokenMint, keypairs)
-        } catch (e) {
-          console.error(e)
-        }
-      })()
+      // ;(async () => {
+      //   try {
+      //     snipeAnyCoinGuaranteed(tokenMint, keypairs)
+      //   } catch (e) {
+      //     console.error(e)
+      //   }
+      // })()
       // } else {
       //   const solanaPrice = await getSolanaPrice()
       //   const marketCapInUsd = solanaPrice * tokenFdv
@@ -294,6 +294,8 @@ const onTransactionBuyAndSignalToken = async (
         }
       }
     }
+  } catch (e) {
+    console.log(e)
   } finally {
     if (isProcessing[tokenMint]) {
       isProcessing[tokenMint][transactionWallet] = false
@@ -411,11 +413,11 @@ const getSnipeTransaction = async (
 
 const expressApp = express().use(express.json())
 
-const options = {
-  key: readFileSync(process.env.HTTPS_KEY_PATH as string),
-  cert: readFileSync(process.env.HTTPS_CERT_PATH as string),
-}
-const server = createServer(options, expressApp)
+// const options = {
+//   key: readFileSync(process.env.HTTPS_KEY_PATH as string),
+//   cert: readFileSync(process.env.HTTPS_CERT_PATH as string),
+// }
+const server = createServer(expressApp)
 
 const socketConnection = new Server(server, {
   cors: {
